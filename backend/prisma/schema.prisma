@@ -1,0 +1,209 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  CLASSIFICATION
+  WASHING
+  DRYING
+  IRONING
+  INSPECTION
+  PACKAGING
+  READY_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum OrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProductionStatus {
+  PENDING
+  IN_PROGRESS
+  QUALITY_CHECK
+  COMPLETED
+  ON_HOLD
+}
+
+enum EmployeeRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+}
+
+enum TimeRecordType {
+  CLOCK_IN
+  CLOCK_OUT
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+model Customer {
+  id          String   @id @default(uuid())
+  name        String
+  email       String   @unique
+  phone       String
+  address     String?
+  notes       String?
+  preferences Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  orders      Order[]
+
+  @@map("customers")
+}
+
+model Order {
+  id          String        @id @default(uuid())
+  orderNumber String        @unique @default(cuid())
+  customerId  String
+  customer    Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  status      OrderStatus   @default(PENDING)
+  priority    OrderPriority @default(MEDIUM)
+  totalAmount Float
+  description String?
+  dueDate     DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  items       OrderItem[]
+  production  Production[]
+
+  @@index([customerId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String  @id @default(uuid())
+  orderId     String
+  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     Product @relation(fields: [productId], references: [id])
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+  description String?
+  fabricType  String?
+  color       String?
+  dirtLevel   String?
+  damageNotes String?
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  sku         String      @unique
+  price       Float
+  stock       Int         @default(0)
+  minStock    Int         @default(0)
+  category    String?
+  unit        String?     @default("un")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
+
+  @@map("products")
+}
+
+model Production {
+  id         String           @id @default(uuid())
+  orderId    String
+  order      Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status     ProductionStatus @default(PENDING)
+  assignedTo String?
+  employee   Employee?        @relation(fields: [assignedTo], references: [id])
+  startDate  DateTime?
+  endDate    DateTime?
+  notes      String?
+  stage      String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  @@index([orderId])
+  @@index([assignedTo])
+  @@index([status])
+  @@map("production")
+}
+
+model Employee {
+  id          String         @id @default(uuid())
+  name        String
+  email       String         @unique
+  phone       String?
+  role        EmployeeRole   @default(STAFF)
+  status      EmployeeStatus @default(ACTIVE)
+  department  String?
+  hireDate    DateTime       @default(now())
+  salary      Float?
+  passwordHash String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  production  Production[]
+  timeRecords TimeRecord[]
+
+  @@map("employees")
+}
+
+model TimeRecord {
+  id         String         @id @default(uuid())
+  employeeId String
+  employee   Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type       TimeRecordType
+  timestamp  DateTime       @default(now())
+  notes      String?
+
+  @@index([employeeId])
+  @@index([timestamp])
+  @@map("time_records")
+}
+
+model Transaction {
+  id          String          @id @default(uuid())
+  type        TransactionType
+  category    String
+  amount      Float
+  description String?
+  date        DateTime        @default(now())
+  paymentMethod String?
+  orderId     String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([type])
+  @@index([date])
+  @@map("transactions")
+}
+
+model Settings {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("settings")
+}
