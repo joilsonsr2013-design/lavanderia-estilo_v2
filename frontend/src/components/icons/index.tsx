@@ -28,6 +28,7 @@ export const CheckIcon = (p: any) => <I {...p}><path d="M20 6 9 17l-5-5"/></I>;
 export const ChevronRightIcon = (p: any) => <I {...p}><path d="m9 18 6-6-6-6"/></I>;
 export const ChevronDownIcon = (p: any) => <I {...p}><path d="m6 9 6 6 6-6"/></I>;
 export const ArrowRightIcon = (p: any) => <I {...p}><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></I>;
+export const ArrowLeftIcon = (p: any) => <I {...p}><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></I>;
 export const EyeIcon = (p: any) => <I {...p}><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></I>;
 export const UserIcon = (p: any) => <I {...p}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></I>;
 export const KeyIcon = (p: any) => <I {...p}><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></I>;
