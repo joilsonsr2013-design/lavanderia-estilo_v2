@@ -83,7 +83,7 @@ const AppRoutes: React.FC = () => {
         <ProtectedRoute title="Produção" element={<ProductionView />} />
       } />
       <Route path="/inventory" element={
-        <ProtectedRoute title="Estoque" element={<InventoryView />} />
+        <ProtectedRoute title="Peças" element={<InventoryView />} />
       } />
       <Route path="/brands" element={
         <ProtectedRoute title="Marcas" element={<BrandsView />} />

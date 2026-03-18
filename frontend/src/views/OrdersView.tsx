@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, Button, Input, Select, Textarea, Modal, Alert, EmptyState, LoadingState, Badge } from '../components/ui';
 import { PlusIcon, EditIcon, TrashIcon, SearchIcon, OrdersIcon, ChevronRightIcon, AlertIcon, CalendarIcon, FilterIcon, TagIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
@@ -134,33 +134,48 @@ const OrdersView: React.FC = () => {
 
   return (
     <div className="space-y-4 animate-fade-in">
+      {/* Header */}
       <Card>
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="flex gap-3 flex-1 flex-wrap items-center">
             <div className="relative flex-1 max-w-xs">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input type="text" placeholder="Buscar pedido, cliente..." value={search} onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" />
+                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400">
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
               <option value="active">Em Andamento</option>
               <option value="">Todos os status</option>
               {WORKFLOW_STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           </div>
-          <Button icon={PlusIcon} onClick={openNew}>Novo Rol de Roupas</Button>
+          {canManage && <Button onClick={openNew} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"><PlusIcon className="h-4 w-4" /> Novo Rol</Button>}
+        </div>
+      </Card>
+
+      {/* Info Card */}
+      <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100">
+        <div className="flex items-start gap-4">
+          <div className="text-3xl">📋</div>
+          <div className="flex-1">
+            <h3 className="font-bold text-slate-900 mb-1">Ordens de Serviço (Rols de Roupas)</h3>
+            <p className="text-sm text-slate-600">
+              Crie novos rols de roupas selecionando peças do catálogo, marcas, cores, tecidos e nível de sujeira. Cada peça pode ter um serviço diferente (Lavar e Passar, Apenas Passar, Limpeza a Seco).
+            </p>
+          </div>
+          <Badge className="bg-purple-600 text-white whitespace-nowrap">{filtered.length} ativo(s)</Badge>
         </div>
       </Card>
 
       {filtered.length === 0 ? (
-        <Card><EmptyState icon={OrdersIcon} message="Nenhum rol de roupas encontrado." action={<Button icon={PlusIcon} onClick={openNew}>Criar Rol</Button>} /></Card>
+        <Card><EmptyState icon={OrdersIcon} message="Nenhum rol de roupas encontrado." action={canManage ? <Button onClick={openNew} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"><PlusIcon className="h-4 w-4" /> Criar Rol</Button> : undefined} /></Card>
       ) : (
         <Card padding={false}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-100">
+                <tr className="border-b border-slate-100 bg-slate-50">
                   {['Rol Nº', 'Cliente', 'Status', 'Prazo', 'Total', 'Ações'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider first:pl-5 last:pr-5">{h}</th>
                   ))}
@@ -171,7 +186,7 @@ const OrdersView: React.FC = () => {
                   <tr key={order.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-5 py-3">
                       <button onClick={() => { setSelectedOrder(order); setDetailModal(true); }}
-                        className="font-mono text-xs font-bold text-brand-600 hover:underline">
+                        className="font-mono text-xs font-bold text-blue-600 hover:underline">
                         #{order.orderNumber?.slice(-8).toUpperCase()}
                       </button>
                     </td>
@@ -212,13 +227,13 @@ const OrdersView: React.FC = () => {
           <div className="text-lg font-bold text-slate-800">Total: {formatCurrency(total)}</div>
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setModal(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} isLoading={saving}>Gerar Rol</Button>
+            <Button onClick={handleSubmit} isLoading={saving} className="bg-blue-600 hover:bg-blue-700 text-white">Gerar Rol</Button>
           </div>
         </div>}>
         {error && <Alert type="error" message={error} className="mb-4" />}
         <form className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Select label="Cliente" required value={customerId} onChange={e => setCustomerId(e.target.value)}
+            <Select label="Cliente *" required value={customerId} onChange={e => setCustomerId(e.target.value)}
               options={customers.map(c => ({ value: c.id, label: c.name }))} placeholder="Selecione o cliente" />
             <Select label="Prioridade" value={priority} onChange={e => setPriority(e.target.value as OrderPriority)} 
               options={Object.values(OrderPriority).map(v => ({ value: v, label: PRIORITY_LABEL[v] }))} />
@@ -228,19 +243,19 @@ const OrdersView: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"><TagIcon className="h-4 w-4" /> Detalhamento das Peças</h4>
-              <Button type="button" size="sm" variant="outline" onClick={addItem} icon={PlusIcon}>Adicionar Peça</Button>
+              <Button type="button" size="sm" variant="outline" onClick={addItem} className="flex items-center gap-1"><PlusIcon className="h-3 w-3" /> Adicionar Peça</Button>
             </div>
             
             <div className="space-y-4">
               {items.map((item, idx) => (
-                <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 relative group animate-slide-in">
+                <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 relative group">
                   <button type="button" onClick={() => removeItem(idx)} className="absolute -top-2 -right-2 bg-white text-red-500 p-1.5 rounded-full shadow-md hover:bg-red-50 transition-colors">
                     <TrashIcon className="h-4 w-4" />
                   </button>
                   
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div className="md:col-span-2">
-                      <Select label="Peça / Serviço" required value={item.productId} onChange={e => updateItem(idx, 'productId', e.target.value)}
+                      <Select label="Peça / Serviço *" required value={item.productId} onChange={e => updateItem(idx, 'productId', e.target.value)}
                         options={servicesList.map(p => ({ value: p.id, label: p.name }))} placeholder="Selecione a peça" />
                     </div>
                     <Input label="Qtd" type="number" min="1" value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value))} />
@@ -251,11 +266,11 @@ const OrdersView: React.FC = () => {
                     <Select label="Serviço" value={item.serviceType} onChange={e => updateItem(idx, 'serviceType', e.target.value)}
                       options={SERVICES.map(s => ({ value: s, label: s }))} />
                     <Select label="Marca" value={item.brandId} onChange={e => updateItem(idx, 'brandId', e.target.value)}
-                      options={brands.map(b => ({ value: b.id, label: b.name }))} placeholder="Selecione a marca" />
+                      options={[{ value: '', label: 'Sem marca' }, ...brands.map(b => ({ value: b.id, label: b.name }))]} />
                     <Select label="Cor" value={item.color} onChange={e => updateItem(idx, 'color', e.target.value)}
-                      options={ITEM_COLORS.map(c => ({ value: c, label: c }))} />
+                      options={[{ value: '', label: 'Selecione' }, ...ITEM_COLORS.map(c => ({ value: c, label: c }))]} />
                     <Select label="Tecido" value={item.fabric} onChange={e => updateItem(idx, 'fabric', e.target.value)}
-                      options={FABRICS.map(f => ({ value: f, label: f }))} />
+                      options={[{ value: '', label: 'Selecione' }, ...FABRICS.map(f => ({ value: f, label: f }))]} />
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
@@ -290,7 +305,7 @@ const OrdersView: React.FC = () => {
               </div>
               <div className="text-right">
                 <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Total do Rol</p>
-                <p className="text-2xl font-black text-brand-600">{formatCurrency(selectedOrder.totalAmount)}</p>
+                <p className="text-2xl font-black text-blue-600">{formatCurrency(selectedOrder.totalAmount)}</p>
                 <p className="text-xs text-slate-500 mt-1">Previsão: {formatDate(selectedOrder.dueDate)}</p>
               </div>
             </div>
@@ -302,7 +317,7 @@ const OrdersView: React.FC = () => {
                   <div key={idx} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 flex items-center justify-center bg-brand-100 text-brand-700 rounded-full text-xs font-bold">{item.quantity}x</span>
+                        <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-700 rounded-full text-xs font-bold">{item.quantity}x</span>
                         <h5 className="font-bold text-slate-800">{item.product?.name}</h5>
                         <Badge variant="outline" className="text-[10px]">{item.serviceType}</Badge>
                       </div>
@@ -314,7 +329,7 @@ const OrdersView: React.FC = () => {
                       </div>
                       {item.damageNotes && (
                         <div className="mt-2 p-2 bg-red-50 rounded text-xs text-red-700 border border-red-100">
-                          <strong>Avarias:</strong> {item.damageNotes}
+                          <strong>⚠️ Avarias:</strong> {item.damageNotes}
                         </div>
                       )}
                     </div>
@@ -329,7 +344,7 @@ const OrdersView: React.FC = () => {
 
             {selectedOrder.description && (
               <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
-                <h4 className="text-xs font-bold text-amber-800 uppercase mb-1">Observações do Rol</h4>
+                <h4 className="text-xs font-bold text-amber-800 uppercase mb-1">📝 Observações do Rol</h4>
                 <p className="text-sm text-amber-900">{selectedOrder.description}</p>
               </div>
             )}

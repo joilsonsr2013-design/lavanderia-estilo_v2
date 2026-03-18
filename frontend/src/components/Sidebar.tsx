@@ -10,7 +10,7 @@ const navItems = [
   { name: 'Ordens de Serviço', path: '/orders',     icon: OrdersIcon,      roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Produção',        path: '/production',   icon: ProductionIcon,  roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Folha de Ponto',  path: '/timeclock',    icon: ClockIcon,       roles: ['ADMIN', 'MANAGER', 'STAFF'] },
-  { name: 'Estoque',         path: '/inventory',    icon: PackageIcon,     roles: ['ADMIN', 'MANAGER', 'STAFF'] },
+  { name: 'Peças',           path: '/inventory',    icon: PackageIcon,     roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Marcas',          path: '/brands',       icon: BrandIcon,       roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Financeiro',      path: '/finance',      icon: FinanceIcon,     roles: ['ADMIN', 'MANAGER'] },
   { name: 'Funcionários',    path: '/employees',    icon: EmployeesIcon,   roles: ['ADMIN', 'MANAGER'] },

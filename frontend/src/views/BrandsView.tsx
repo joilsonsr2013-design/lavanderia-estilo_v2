@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Button, Input, Textarea, Modal, Alert, EmptyState, LoadingState, Badge } from '../components/ui';
 import { PlusIcon, EditIcon, TrashIcon, SearchIcon } from '../components/icons';
 import { useAuth } from '../contexts/AuthContext';
+import { useAppContext } from '../contexts/AppContext';
 import { brandsApi } from '../services/api';
 import type { Brand } from '../types';
 
@@ -13,8 +14,7 @@ const emptyForm = {
 
 const BrandsView: React.FC = () => {
   const { canManage } = useAuth();
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { brands, loadingBrands, refreshBrands } = useAppContext();
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Brand | null>(null);
@@ -23,22 +23,6 @@ const BrandsView: React.FC = () => {
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState('');
-
-  useEffect(() => {
-    loadBrands();
-  }, []);
-
-  const loadBrands = async () => {
-    setLoading(true);
-    try {
-      const data = await brandsApi.list();
-      setBrands(data);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const filtered = brands.filter(b => 
     !search || b.name.toLowerCase().includes(search.toLowerCase()) || 
@@ -81,7 +65,7 @@ const BrandsView: React.FC = () => {
       } else {
         await brandsApi.create(form);
       }
-      await loadBrands(); 
+      await refreshBrands(); 
       setModal(false);
     } catch (err: any) { 
       setError(err.message); 
@@ -95,14 +79,14 @@ const BrandsView: React.FC = () => {
     setDeleteError('');
     try {
       await brandsApi.delete(id);
-      await loadBrands();
+      await refreshBrands();
       setDeleting(null);
     } catch (err: any) {
       setDeleteError(err.message);
     }
   };
 
-  if (loading) return <LoadingState message="Carregando marcas..." />;
+  if (loadingBrands) return <LoadingState message="Carregando marcas..." />;
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -129,16 +113,33 @@ const BrandsView: React.FC = () => {
         </div>
       </Card>
 
+      {/* Info Card */}
+      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100">
+        <div className="flex items-start gap-4">
+          <div className="text-3xl">🏷️</div>
+          <div className="flex-1">
+            <h3 className="font-bold text-slate-900 mb-1">Catálogo de Marcas</h3>
+            <p className="text-sm text-slate-600">
+              Gerencie todas as marcas de roupas cadastradas no sistema. Essas marcas serão utilizadas ao criar Ordens de Serviço para identificar a procedência de cada peça.
+            </p>
+          </div>
+          <Badge className="bg-blue-600 text-white whitespace-nowrap">{filtered.length} marcas</Badge>
+        </div>
+      </Card>
+
       {/* Error Alert */}
       {error && <Alert type="error" message={error} onClose={() => setError('')} />}
+      {deleteError && <Alert type="error" message={deleteError} onClose={() => setDeleteError('')} />}
 
       {/* Brands Grid */}
       {filtered.length === 0 ? (
-        <EmptyState 
-          icon="📦" 
-          title="Nenhuma marca cadastrada" 
-          description="Comece criando uma nova marca para o seu catálogo." 
-        />
+        <Card>
+          <EmptyState 
+            icon="📦" 
+            title="Nenhuma marca cadastrada" 
+            description="Comece criando uma nova marca para o seu catálogo." 
+          />
+        </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(brand => (
@@ -150,7 +151,7 @@ const BrandsView: React.FC = () => {
                     <h3 className="font-semibold text-lg text-slate-900">{brand.name}</h3>
                     {brand._count?.orderItems && (
                       <Badge variant="secondary" className="mt-1">
-                        {brand._count.orderItems} itens
+                        {brand._count.orderItems} peça(s)
                       </Badge>
                     )}
                   </div>
@@ -164,15 +165,17 @@ const BrandsView: React.FC = () => {
                 {/* Logo URL */}
                 {brand.logoUrl && (
                   <div className="mb-3 p-2 bg-slate-50 rounded border border-slate-200">
-                    <p className="text-xs text-slate-500">Logo URL:</p>
-                    <p className="text-xs text-blue-600 truncate">{brand.logoUrl}</p>
+                    <p className="text-xs text-slate-500 font-semibold mb-1">Logo:</p>
+                    <a href={brand.logoUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline truncate block">
+                      {brand.logoUrl}
+                    </a>
                   </div>
                 )}
 
                 {/* Timestamps */}
                 <div className="text-xs text-slate-400 mb-4 mt-auto">
                   {brand.createdAt && (
-                    <p>Criado: {new Date(brand.createdAt).toLocaleDateString('pt-BR')}</p>
+                    <p>Criado em: {new Date(brand.createdAt).toLocaleDateString('pt-BR')}</p>
                   )}
                 </div>
 
