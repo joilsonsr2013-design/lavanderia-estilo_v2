@@ -21,6 +21,27 @@ export interface Customer {
   _count?: { orders: number };
 }
 
+// ============ BRAND ============
+export interface Brand {
+  id: string;
+  name: string;
+  description?: string;
+  logoUrl?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  _count?: { orderItems: number };
+}
+
+// ============ CATEGORY ============
+export interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  _count?: { products: number };
+}
+
 // ============ PRODUCT / INVENTORY ============
 export interface Product {
   id: string;
@@ -33,7 +54,8 @@ export interface Product {
   dryCleanPrice?: number;
   stock: number;
   minStock: number;
-  category?: string;
+  categoryId?: string;
+  category?: Category;
   unit?: string;
   isLowStock?: boolean;
   createdAt?: string;
@@ -91,7 +113,8 @@ export interface OrderItem {
   unitPrice: number;
   totalPrice: number;
   serviceType?: string;
-  brand?: string;
+  brandId?: string;
+  brand?: Brand;
   color?: string;
   fabric?: string;
   dirtLevel?: string;

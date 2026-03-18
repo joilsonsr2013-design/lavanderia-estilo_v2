@@ -64,6 +64,24 @@ export const ordersApi = {
   delete: (id: string) => request<void>(`/api/orders/${id}`, { method: 'DELETE' }),
 };
 
+// ============ BRANDS ============
+export const brandsApi = {
+  list: (search?: string) => request<any[]>(`/api/brands${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  get: (id: string) => request<any>(`/api/brands/${id}`),
+  create: (data: any) => request<any>('/api/brands', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) => request<any>(`/api/brands/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => request<void>(`/api/brands/${id}`, { method: 'DELETE' }),
+};
+
+// ============ CATEGORIES ============
+export const categoriesApi = {
+  list: (search?: string) => request<any[]>(`/api/categories${search ? `?search=${encodeURIComponent(search)}` : ''}`),
+  get: (id: string) => request<any>(`/api/categories/${id}`),
+  create: (data: any) => request<any>('/api/categories', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) => request<any>(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => request<void>(`/api/categories/${id}`, { method: 'DELETE' }),
+};
+
 // ============ PRODUCTS ============
 export const productsApi = {
   list: (params?: Record<string, string>) => {

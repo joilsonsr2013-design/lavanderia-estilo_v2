@@ -102,9 +102,10 @@ model OrderItem {
   unitPrice   Float
   totalPrice  Float
   
-  // Atributos de Lavanderia Profissional
+  // Atributos de Lavanderia Profissional (Referenciando Tabelas)
   serviceType String? // Lavar e Passar, Apenas Passar, Limpeza a Seco, etc.
-  brand       String? // Marca da peça (ex: Zara, Dudalina)
+  brandId     String?
+  brand       Brand?  @relation(fields: [brandId], references: [id])
   color       String? // Cor predominante
   fabric      String? // Tipo de tecido (ex: Algodão, Seda, Linho)
   dirtLevel   String? // Nível de sujidade (Leve, Médio, Pesado)
@@ -113,7 +114,31 @@ model OrderItem {
 
   @@index([orderId])
   @@index([productId])
+  @@index([brandId])
   @@map("order_items")
+}
+
+model Brand {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String?
+  logoUrl     String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  orderItems  OrderItem[]
+
+  @@map("brands")
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+
+  @@map("categories")
 }
 
 model Product {
@@ -132,13 +157,15 @@ model Product {
   stock             Int         @default(0)
   minStock          Int         @default(0)
   
-  category          String?     // Vestuário Masculino, Cama, Banho, etc.
+  categoryId        String?
+  category          Category?   @relation(fields: [categoryId], references: [id])
   unit              String?     @default("pç") // pç, un, kg, m2
   
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   orderItems        OrderItem[]
 
+  @@index([categoryId])
   @@map("products")
 }
 
