@@ -14,6 +14,7 @@ import EmployeesView from './views/EmployeesView';
 import TimeClockView from './views/TimeClockView';
 import SettingsView from './views/SettingsView';
 import DocumentationView from './views/DocumentationView';
+import BrandsView from './views/BrandsView';
 import { Spinner } from './components/ui';
 
 // Route guard that checks auth and optionally role
@@ -83,6 +84,9 @@ const AppRoutes: React.FC = () => {
       } />
       <Route path="/inventory" element={
         <ProtectedRoute title="Estoque" element={<InventoryView />} />
+      } />
+      <Route path="/brands" element={
+        <ProtectedRoute title="Marcas" element={<BrandsView />} />
       } />
       <Route path="/timeclock" element={
         <ProtectedRoute title="Folha de Ponto" element={<TimeClockView />} />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { DashboardIcon, UsersIcon, OrdersIcon, ProductionIcon, PackageIcon, FinanceIcon, ClockIcon, EmployeesIcon, SettingsIcon, DocsIcon, LogoutIcon, WashIcon, UserIcon } from './icons';
+import { DashboardIcon, UsersIcon, OrdersIcon, ProductionIcon, PackageIcon, FinanceIcon, ClockIcon, EmployeesIcon, SettingsIcon, DocsIcon, LogoutIcon, WashIcon, UserIcon, BrandIcon } from './icons';
 import { ROLE_LABEL } from '../constants';
 
 const navItems = [
@@ -11,6 +11,7 @@ const navItems = [
   { name: 'Produção',        path: '/production',   icon: ProductionIcon,  roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Folha de Ponto',  path: '/timeclock',    icon: ClockIcon,       roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Estoque',         path: '/inventory',    icon: PackageIcon,     roles: ['ADMIN', 'MANAGER', 'STAFF'] },
+  { name: 'Marcas',          path: '/brands',       icon: BrandIcon,       roles: ['ADMIN', 'MANAGER'] },
   { name: 'Financeiro',      path: '/finance',      icon: FinanceIcon,     roles: ['ADMIN', 'MANAGER'] },
   { name: 'Funcionários',    path: '/employees',    icon: EmployeesIcon,   roles: ['ADMIN', 'MANAGER'] },
   { name: 'Configurações',   path: '/settings',     icon: SettingsIcon,    roles: ['ADMIN'] },
