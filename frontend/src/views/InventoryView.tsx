@@ -7,9 +7,20 @@ import { productsApi } from '../services/api';
 import { formatCurrency } from '../utils/helpers';
 import type { Product } from '../types';
 
-const emptyForm = { name: '', description: '', sku: '', price: '0', stock: '0', minStock: '0', category: '', unit: 'pç' };
+const emptyForm = { 
+  name: '', 
+  description: '', 
+  sku: '', 
+  price: '0', 
+  washAndIronPrice: '0', 
+  ironOnlyPrice: '0', 
+  stock: '0', 
+  minStock: '0', 
+  category: 'Vestuário', 
+  unit: 'pç' 
+};
 
-const CATEGORIES = ['Lavagem', 'Lavagem Especial', 'Passadoria', 'Insumos', 'Embalagem', 'Outros'];
+const CATEGORIES = ['Vestuário', 'Cama e Banho', 'Lavagem Especial', 'Insumos', 'Embalagem', 'Outros'];
 const UNITS = ['pç', 'un', 'kg', 'L', 'm', 'cx', 'pc'];
 
 const InventoryView: React.FC = () => {
@@ -39,7 +50,18 @@ const InventoryView: React.FC = () => {
   const openNew = () => { setEditing(null); setForm(emptyForm); setError(''); setModal(true); };
   const openEdit = (p: Product) => {
     setEditing(p);
-    setForm({ name: p.name, description: p.description || '', sku: p.sku, price: String(p.price), stock: String(p.stock), minStock: String(p.minStock), category: p.category || '', unit: p.unit || 'pç' });
+    setForm({ 
+      name: p.name, 
+      description: p.description || '', 
+      sku: p.sku, 
+      price: String(p.price), 
+      washAndIronPrice: String(p.washAndIronPrice || p.price),
+      ironOnlyPrice: String(p.ironOnlyPrice || 0),
+      stock: String(p.stock), 
+      minStock: String(p.minStock), 
+      category: p.category || 'Vestuário', 
+      unit: p.unit || 'pç' 
+    });
     setError(''); setModal(true);
   };
 
@@ -49,7 +71,14 @@ const InventoryView: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); setSaving(true); setError('');
     try {
-      const data = { ...form, price: Number(form.price), stock: Number(form.stock), minStock: Number(form.minStock) };
+      const data = { 
+        ...form, 
+        price: Number(form.price), 
+        washAndIronPrice: Number(form.washAndIronPrice),
+        ironOnlyPrice: Number(form.ironOnlyPrice),
+        stock: Number(form.stock), 
+        minStock: Number(form.minStock) 
+      };
       if (editing) await productsApi.update(editing.id, data);
       else await productsApi.create(data);
       await refreshInventory(); setModal(false);
@@ -109,7 +138,7 @@ const InventoryView: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-100">
-                  {['Nome', 'SKU', 'Categoria', 'Preço', 'Estoque', 'Mín.', 'Status', canManage ? 'Ações' : ''].map(h => (
+                  {['Nome', 'SKU', 'Categoria', 'Lavar e Passar', 'Apenas Passar', 'Estoque', 'Status', canManage ? 'Ações' : ''].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider first:pl-5 last:pr-5">{h}</th>
                   ))}
                 </tr>
@@ -123,13 +152,13 @@ const InventoryView: React.FC = () => {
                     </td>
                     <td className="px-4 py-3"><span className="font-mono text-xs text-slate-500">{item.sku}</span></td>
                     <td className="px-4 py-3">{item.category && <Badge color="bg-slate-100 text-slate-600">{item.category}</Badge>}</td>
-                    <td className="px-4 py-3 font-semibold text-slate-700">{formatCurrency(item.price)}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-700">{formatCurrency(item.washAndIronPrice || item.price)}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-700">{item.ironOnlyPrice ? formatCurrency(item.ironOnlyPrice) : '-'}</td>
                     <td className="px-4 py-3">
                       <span className={`font-bold text-sm ${item.isLowStock ? 'text-red-600' : 'text-slate-700'}`}>
                         {item.stock} {item.unit}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-slate-500">{item.minStock} {item.unit}</td>
                     <td className="px-4 py-3">
                       {item.isLowStock
                         ? <Badge color="bg-red-100 text-red-700">⚠ Baixo</Badge>
@@ -161,8 +190,8 @@ const InventoryView: React.FC = () => {
           {error && <Alert type="error" message={error} className="mb-4" />}
           <form id="productForm" onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <Input name="name" label="Nome" value={form.name} onChange={handleChange} required className="col-span-2" containerClassName="col-span-2" />
-              <Input name="sku" label="SKU / Código" value={form.sku} onChange={handleChange} required placeholder="LAV-CAM-001" />
+              <Input name="name" label="Nome da Peça / Produto" value={form.name} onChange={handleChange} required className="col-span-2" containerClassName="col-span-2" />
+              <Input name="sku" label="SKU / Código" value={form.sku} onChange={handleChange} required placeholder="VEST-CAM-001" />
               <div className="space-y-1">
                 <label className="block text-sm font-semibold text-slate-700">Categoria</label>
                 <select name="category" value={form.category} onChange={handleChange}
@@ -171,7 +200,13 @@ const InventoryView: React.FC = () => {
                   {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
-              <Input name="price" label="Preço (R$)" type="number" step="0.01" min="0" value={form.price} onChange={handleChange} required />
+              
+              <div className="col-span-2 grid grid-cols-3 gap-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                <Input name="price" label="Preço Base (R$)" type="number" step="0.01" min="0" value={form.price} onChange={handleChange} required />
+                <Input name="washAndIronPrice" label="Lavar e Passar (R$)" type="number" step="0.01" min="0" value={form.washAndIronPrice} onChange={handleChange} />
+                <Input name="ironOnlyPrice" label="Apenas Passar (R$)" type="number" step="0.01" min="0" value={form.ironOnlyPrice} onChange={handleChange} />
+              </div>
+
               <div className="space-y-1">
                 <label className="block text-sm font-semibold text-slate-700">Unidade</label>
                 <select name="unit" value={form.unit} onChange={handleChange}
@@ -179,10 +214,13 @@ const InventoryView: React.FC = () => {
                   {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
                 </select>
               </div>
-              <Input name="stock" label="Estoque Atual" type="number" min="0" value={form.stock} onChange={handleChange} />
-              <Input name="minStock" label="Estoque Mínimo" type="number" min="0" value={form.minStock} onChange={handleChange} />
+              <div className="grid grid-cols-2 gap-2">
+                <Input name="stock" label="Estoque Atual" type="number" min="0" value={form.stock} onChange={handleChange} />
+                <Input name="minStock" label="Estoque Mínimo" type="number" min="0" value={form.minStock} onChange={handleChange} />
+              </div>
+              
               <div className="space-y-1 col-span-2">
-                <label className="block text-sm font-semibold text-slate-700">Descrição</label>
+                <label className="block text-sm font-semibold text-slate-700">Descrição / Notas Internas</label>
                 <textarea name="description" value={form.description} onChange={handleChange} rows={2}
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" />
               </div>

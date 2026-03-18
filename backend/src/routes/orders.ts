@@ -73,11 +73,12 @@ orderRoutes.post('/', async (req, res) => {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             totalPrice: item.totalPrice,
-            description: item.description,
-            fabricType: item.fabricType,
+            serviceType: item.serviceType,
+            brand: item.brand,
             color: item.color,
             dirtLevel: item.dirtLevel,
-            damageNotes: item.damageNotes
+            damageNotes: item.damageNotes,
+            notes: item.notes
           }))
         }
       },
