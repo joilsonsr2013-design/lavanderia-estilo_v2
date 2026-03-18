@@ -1,13 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, Button, Input, Textarea, Modal, Alert, EmptyState, LoadingState, Badge } from '../components/ui';
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon, UsersIcon, PhoneIcon, MailIcon, MapPinIcon, InfoIcon, ArrowLeftIcon, CalendarIcon, PackageIcon } from '../components/icons';
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon, UsersIcon, PhoneIcon, MailIcon, MapPinIcon, EyeIcon, ClipboardListIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
 import { customersApi } from '../services/api';
 import { formatDate, formatCurrency } from '../utils/helpers';
-import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, FINAL_STATUSES } from '../constants';
-import type { Customer, Order } from '../types';
+import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR } from '../constants';
+import { OrderStatus, type Customer, type Order } from '../types';
 
 const empty = { name: '', email: '', phone: '', address: '', notes: '' };
+
+// Status que representam ordens ativas (não finalizadas)
+const ACTIVE_STATUSES = [
+  OrderStatus.PENDING,
+  OrderStatus.CLASSIFICATION,
+  OrderStatus.WASHING,
+  OrderStatus.DRYING,
+  OrderStatus.IRONING,
+  OrderStatus.INSPECTION,
+  OrderStatus.PACKAGING,
+  OrderStatus.READY_FOR_DELIVERY,
+];
 
 const CustomersView: React.FC = () => {
   const { customers, loadingCustomers, refreshCustomers } = useAppContext();
@@ -18,11 +30,11 @@ const CustomersView: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState<string | null>(null);
-  
-  // Detalhes do cliente selecionado
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+
+  // Estado para detalhes do cliente
+  const [detailModal, setDetailModal] = useState(false);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer & { orders?: Order[] } | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [customerOrders, setCustomerOrders] = useState<Order[]>([]);
 
   const filtered = customers.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -31,26 +43,29 @@ const CustomersView: React.FC = () => {
   );
 
   const openNew = () => { setEditing(null); setForm(empty); setError(''); setModal(true); };
-  const openEdit = (e: React.MouseEvent, c: Customer) => {
+  const openEdit = (c: Customer, e: React.MouseEvent) => {
     e.stopPropagation();
     setEditing(c);
     setForm({ name: c.name, email: c.email, phone: c.phone || '', address: c.address || '', notes: c.notes || '' });
     setError(''); setModal(true);
   };
-  const closeModal = () => { setModal(false); setEditing(null); };
 
-  const handleSelectCustomer = async (customer: Customer) => {
-    setSelectedCustomer(customer);
+  const openDetails = async (c: Customer) => {
     setLoadingDetails(true);
+    setSelectedCustomer(c as Customer & { orders?: Order[] });
+    setDetailModal(true);
     try {
-      const details = await customersApi.get(customer.id);
-      setCustomerOrders(details.orders || []);
-    } catch (err) {
-      console.error('Erro ao carregar detalhes do cliente:', err);
+      const details = await customersApi.get(c.id);
+      setSelectedCustomer(details);
+    } catch (err: any) {
+      console.error('Erro ao carregar detalhes:', err);
     } finally {
       setLoadingDetails(false);
     }
   };
+
+  const closeModal = () => { setModal(false); setEditing(null); };
+  const closeDetailModal = () => { setDetailModal(false); setSelectedCustomer(null); };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -66,7 +81,7 @@ const CustomersView: React.FC = () => {
     finally { setSaving(false); }
   };
 
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
+  const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!confirm('Excluir este cliente? Todos os pedidos associados também serão excluídos.')) return;
     setDeleting(id);
@@ -75,127 +90,8 @@ const CustomersView: React.FC = () => {
     finally { setDeleting(null); }
   };
 
-  // Se um cliente estiver selecionado, mostra a tela de detalhes
-  if (selectedCustomer) {
-    const activeOrders = customerOrders.filter(o => !FINAL_STATUSES.includes(o.status));
-    const pastOrders = customerOrders.filter(o => FINAL_STATUSES.includes(o.status));
-
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" onClick={() => setSelectedCustomer(null)} icon={ArrowLeftIcon}>Voltar</Button>
-          <h2 className="text-xl font-bold text-slate-800">Detalhes do Cliente</h2>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Informações de Cadastro */}
-          <div className="lg:col-span-1 space-y-6">
-            <Card title="Informações de Cadastro" icon={InfoIcon}>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Nome</label>
-                  <p className="text-slate-800 font-medium">{selectedCustomer.name}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-slate-100 rounded-lg text-slate-500"><MailIcon className="h-4 w-4" /></div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">E-mail</label>
-                    <p className="text-slate-800 text-sm">{selectedCustomer.email}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-slate-100 rounded-lg text-slate-500"><PhoneIcon className="h-4 w-4" /></div>
-                  <div>
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Telefone</label>
-                    <p className="text-slate-800 text-sm">{selectedCustomer.phone}</p>
-                  </div>
-                </div>
-                {selectedCustomer.address && (
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-100 rounded-lg text-slate-500"><MapPinIcon className="h-4 w-4" /></div>
-                    <div>
-                      <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">Endereço</label>
-                      <p className="text-slate-800 text-sm">{selectedCustomer.address}</p>
-                    </div>
-                  </div>
-                )}
-                {selectedCustomer.notes && (
-                  <div className="pt-4 border-t border-slate-100">
-                    <label className="text-xs font-semibold text-slate-400 uppercase tracking-wider block mb-1">Observações</label>
-                    <p className="text-slate-600 text-sm italic">"{selectedCustomer.notes}"</p>
-                  </div>
-                )}
-                <div className="pt-4 border-t border-slate-100">
-                   <p className="text-slate-400 text-xs">Cadastrado em {formatDate(selectedCustomer.createdAt || '')}</p>
-                </div>
-                <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1" icon={EditIcon} onClick={(e) => openEdit(e, selectedCustomer)}>Editar</Button>
-                </div>
-              </div>
-            </Card>
-          </div>
-
-          {/* Ordens de Serviço */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card title="Ordens de Serviço Ativas" subtitle={`${activeOrders.length} pedido(s) em andamento`}>
-              {loadingDetails ? (
-                <div className="py-12 flex justify-center"><LoadingState message="Carregando pedidos..." /></div>
-              ) : activeOrders.length === 0 ? (
-                <EmptyState icon={PackageIcon} message="Nenhuma ordem de serviço ativa no momento." />
-              ) : (
-                <div className="space-y-3">
-                  {activeOrders.map(order => (
-                    <div key={order.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className={`p-2 rounded-lg ${STATUS_BG[order.status]} ${STATUS_COLOR[order.status]}`}>
-                          <PackageIcon className="h-5 w-5" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-slate-800 text-sm">#{order.orderNumber}</p>
-                          <div className="flex items-center gap-2 text-xs text-slate-500">
-                            <CalendarIcon className="h-3 w-3" />
-                            {formatDate(order.createdAt)}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-6">
-                        <div className="text-right hidden sm:block">
-                          <p className="text-xs font-semibold text-slate-400 uppercase">Valor</p>
-                          <p className="text-sm font-bold text-slate-700">{formatCurrency(order.totalAmount)}</p>
-                        </div>
-                        <Badge color={`${STATUS_BG[order.status]} ${STATUS_COLOR[order.status]}`}>
-                          {STATUS_LABEL[order.status]}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-
-            {pastOrders.length > 0 && (
-              <Card title="Histórico Recente" subtitle="Últimos pedidos concluídos">
-                <div className="space-y-3">
-                  {pastOrders.slice(0, 5).map(order => (
-                    <div key={order.id} className="flex items-center justify-between p-3 rounded-xl border border-dashed border-slate-200 opacity-75">
-                      <div className="flex items-center gap-3">
-                        <p className="font-medium text-slate-700 text-sm">#{order.orderNumber}</p>
-                        <span className="text-xs text-slate-400">{formatDate(order.createdAt)}</span>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <p className="text-sm font-medium text-slate-600">{formatCurrency(order.totalAmount)}</p>
-                        <Badge>{STATUS_LABEL[order.status]}</Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Filtra ordens ativas
+  const activeOrders = selectedCustomer?.orders?.filter(o => ACTIVE_STATUSES.includes(o.status)) || [];
 
   return (
     <div className="space-y-4 animate-fade-in">
@@ -220,7 +116,7 @@ const CustomersView: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {filtered.map(c => (
-            <Card key={c.id} className="hover:shadow-md transition-all cursor-pointer border-l-4 border-l-transparent hover:border-l-brand-500" onClick={() => handleSelectCustomer(c)}>
+            <Card key={c.id} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => openDetails(c)}>
               <div className="flex justify-between items-start mb-3">
                 <div className="flex-1">
                   <h3 className="font-bold text-slate-800 text-sm">{c.name}</h3>
@@ -228,9 +124,9 @@ const CustomersView: React.FC = () => {
                     <Badge color="bg-brand-100 text-brand-700" className="mt-1">{c._count.orders} pedido(s)</Badge>
                   )}
                 </div>
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={(e) => openEdit(e, c)} title="Editar"><EditIcon className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="sm" onClick={(e) => handleDelete(e, c.id)} className="text-red-500" isLoading={deleting === c.id} title="Excluir"><TrashIcon className="h-4 w-4" /></Button>
+                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                  <Button variant="ghost" size="sm" onClick={(e) => openEdit(c, e)} title="Editar"><EditIcon className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="sm" onClick={(e) => handleDelete(c.id, e)} className="text-red-500" isLoading={deleting === c.id} title="Excluir"><TrashIcon className="h-4 w-4" /></Button>
                 </div>
               </div>
               <div className="space-y-1.5 text-xs text-slate-500">
@@ -239,11 +135,17 @@ const CustomersView: React.FC = () => {
                 {c.address && <div className="flex items-center gap-2"><MapPinIcon className="h-3 w-3" /><span className="truncate">{c.address}</span></div>}
                 {c.createdAt && <p className="text-slate-400 text-xs pt-1 border-t border-slate-100">Cliente desde {formatDate(c.createdAt)}</p>}
               </div>
+              <div className="mt-2 pt-2 border-t border-slate-100">
+                <span className="text-xs text-brand-600 flex items-center gap-1">
+                  <EyeIcon className="h-3 w-3" /> Ver detalhes
+                </span>
+              </div>
             </Card>
           ))}
         </div>
       )}
 
+      {/* Modal de Edição/Criação */}
       <Modal isOpen={modal} onClose={closeModal} title={editing ? 'Editar Cliente' : 'Novo Cliente'}
         footer={<>
           <Button variant="outline" onClick={closeModal}>Cancelar</Button>
@@ -257,6 +159,145 @@ const CustomersView: React.FC = () => {
           <Input name="address" label="Endereço" value={form.address} onChange={handleChange} placeholder="Rua X, nº 100 - Cidade" />
           <Textarea name="notes" label="Observações" value={form.notes} onChange={handleChange} placeholder="Preferências, alergias, etc." />
         </form>
+      </Modal>
+
+      {/* Modal de Detalhes do Cliente */}
+      <Modal isOpen={detailModal} onClose={closeDetailModal} title={selectedCustomer?.name || 'Detalhes do Cliente'} size="lg">
+        {loadingDetails ? (
+          <LoadingState message="Carregando detalhes..." />
+        ) : selectedCustomer ? (
+          <div className="space-y-6">
+            {/* Informações do Cliente */}
+            <div>
+              <h4 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                <UsersIcon className="h-4 w-4" /> Informações de Cadastro
+              </h4>
+              <div className="bg-slate-50 rounded-xl p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <MailIcon className="h-4 w-4 text-slate-400" />
+                  <span className="text-slate-600">E-mail:</span>
+                  <span className="text-slate-800">{selectedCustomer.email}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <PhoneIcon className="h-4 w-4 text-slate-400" />
+                  <span className="text-slate-600">Telefone:</span>
+                  <span className="text-slate-800">{selectedCustomer.phone || 'Não informado'}</span>
+                </div>
+                {selectedCustomer.address && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <MapPinIcon className="h-4 w-4 text-slate-400" />
+                    <span className="text-slate-600">Endereço:</span>
+                    <span className="text-slate-800">{selectedCustomer.address}</span>
+                  </div>
+                )}
+                {selectedCustomer.notes && (
+                  <div className="pt-2 border-t border-slate-200 mt-2">
+                    <span className="text-sm text-slate-600">Observações: </span>
+                    <span className="text-sm text-slate-800">{selectedCustomer.notes}</span>
+                  </div>
+                )}
+                {selectedCustomer.createdAt && (
+                  <div className="text-xs text-slate-400 pt-2 border-t border-slate-200">
+                    Cliente desde {formatDate(selectedCustomer.createdAt)}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Ordens de Serviço Ativas */}
+            <div>
+              <h4 className="text-sm font-semibold text-slate-600 mb-3 flex items-center gap-2">
+                <ClipboardListIcon className="h-4 w-4" /> Ordens de Serviço Ativas ({activeOrders.length})
+              </h4>
+              {activeOrders.length === 0 ? (
+                <div className="bg-slate-50 rounded-xl p-4 text-center text-sm text-slate-500">
+                  Nenhuma ordem de serviço ativa no momento.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {activeOrders.map(order => (
+                    <div key={order.id} className="bg-slate-50 rounded-xl p-4 border border-slate-100 hover:border-slate-200 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <span className="font-semibold text-slate-800 text-sm">#{order.orderNumber}</span>
+                          {order.priority && (
+                            <Badge color={PRIORITY_COLOR[order.priority as keyof typeof PRIORITY_COLOR]} className="ml-2">
+                              {PRIORITY_LABEL[order.priority as keyof typeof PRIORITY_LABEL]}
+                            </Badge>
+                          )}
+                        </div>
+                        <Badge color={STATUS_BG[order.status] + ' ' + STATUS_COLOR[order.status]}>
+                          {STATUS_LABEL[order.status]}
+                        </Badge>
+                      </div>
+                      {order.description && (
+                        <p className="text-xs text-slate-500 mb-2">{order.description}</p>
+                      )}
+                      <div className="flex flex-wrap gap-4 text-xs text-slate-500">
+                        <span>Valor: <strong className="text-slate-700">{formatCurrency(order.totalAmount)}</strong></span>
+                        {order.dueDate && (
+                          <span>Entrega: <strong className="text-slate-700">{formatDate(order.dueDate)}</strong></span>
+                        )}
+                        <span>Criado: <strong className="text-slate-700">{formatDate(order.createdAt)}</strong></span>
+                      </div>
+                      {order.items && order.items.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-slate-200">
+                          <p className="text-xs text-slate-500 mb-1">Itens:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {order.items.slice(0, 3).map((item, idx) => (
+                              <span key={idx} className="text-xs bg-white px-2 py-1 rounded border border-slate-200">
+                                {item.product?.name || 'Produto'} x{item.quantity}
+                              </span>
+                            ))}
+                            {order.items.length > 3 && (
+                              <span className="text-xs text-slate-400">+{order.items.length - 3} mais</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Histórico de Pedidos */}
+            {selectedCustomer.orders && selectedCustomer.orders.length > activeOrders.length && (
+              <div>
+                <h4 className="text-sm font-semibold text-slate-600 mb-3">
+                  Histórico de Pedidos ({selectedCustomer.orders.length - activeOrders.length} finalizados)
+                </h4>
+                <div className="text-xs text-slate-500 bg-slate-50 rounded-xl p-3">
+                  {selectedCustomer.orders.filter(o => !ACTIVE_STATUSES.includes(o.status)).slice(0, 5).map(order => (
+                    <div key={order.id} className="flex justify-between items-center py-1 border-b border-slate-100 last:border-0">
+                      <span>#{order.orderNumber}</span>
+                      <span className="text-slate-400">{formatDate(order.createdAt)}</span>
+                      <Badge color={STATUS_BG[order.status] + ' ' + STATUS_COLOR[order.status]} className="text-xs">
+                        {STATUS_LABEL[order.status]}
+                      </Badge>
+                    </div>
+                  ))}
+                  {selectedCustomer.orders.length > 5 && (
+                    <p className="text-center text-slate-400 mt-2">
+                      E mais {selectedCustomer.orders.length - 5} pedidos...
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Ações */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+              <Button variant="outline" onClick={closeDetailModal}>Fechar</Button>
+              <Button onClick={() => {
+                closeDetailModal();
+                openEdit(selectedCustomer, { stopPropagation: () => {} } as React.MouseEvent);
+              }}>
+                <EditIcon className="h-4 w-4 mr-1" /> Editar Cliente
+              </Button>
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </div>
   );

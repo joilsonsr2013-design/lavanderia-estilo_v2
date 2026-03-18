@@ -51,9 +51,10 @@ interface CardProps {
   children: React.ReactNode;
   className?: string;
   padding?: boolean;
+  onClick?: () => void;
 }
-export const Card: React.FC<CardProps> = ({ title, subtitle, action, children, className = '', padding = true }) => (
-  <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 ${padding ? 'p-5' : ''} ${className}`}>
+export const Card: React.FC<CardProps> = ({ title, subtitle, action, children, className = '', padding = true, onClick }) => (
+  <div className={`bg-white rounded-2xl shadow-sm border border-slate-100 ${padding ? 'p-5' : ''} ${className}`} onClick={onClick}>
     {(title || action) && (
       <div className="flex items-center justify-between mb-4">
         <div>

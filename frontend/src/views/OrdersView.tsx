@@ -8,11 +8,23 @@ import { formatDate, formatCurrency, isOverdue, daysUntil } from '../utils/helpe
 import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL, WORKFLOW_STAGES, FINAL_STATUSES, FABRIC_TYPES, ITEM_COLORS, DIRT_LEVELS } from '../constants';
 import { OrderStatus, OrderPriority, type Order, type Product } from '../types';
 
+// Status que representam ordens ativas (em andamento)
+const ACTIVE_ORDER_STATUSES = [
+  OrderStatus.PENDING,
+  OrderStatus.CLASSIFICATION,
+  OrderStatus.WASHING,
+  OrderStatus.DRYING,
+  OrderStatus.IRONING,
+  OrderStatus.INSPECTION,
+  OrderStatus.PACKAGING,
+  OrderStatus.READY_FOR_DELIVERY,
+];
+
 const OrdersView: React.FC = () => {
   const { orders, customers, inventory, refreshOrders } = useAppContext();
   const { canManage } = useAuth();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('active'); // Por padrão, mostrar apenas ordens ativas
   const [modal, setModal] = useState(false);
   const [detailModal, setDetailModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
@@ -34,7 +46,17 @@ const OrdersView: React.FC = () => {
 
   const filtered = orders.filter(o => {
     const matchSearch = !search || o.orderNumber?.toLowerCase().includes(search.toLowerCase()) || o.customer?.name?.toLowerCase().includes(search.toLowerCase());
-    const matchStatus = !statusFilter || o.status === statusFilter;
+
+    // Filtro por status
+    let matchStatus = true;
+    if (statusFilter === 'active') {
+      // Mostrar apenas ordens ativas (não entregues/canceladas)
+      matchStatus = ACTIVE_ORDER_STATUSES.includes(o.status);
+    } else if (statusFilter) {
+      // Filtro por status específico
+      matchStatus = o.status === statusFilter;
+    }
+
     return matchSearch && matchStatus;
   });
 
@@ -99,14 +121,21 @@ const OrdersView: React.FC = () => {
   };
 
   const priorityOpts = Object.values(OrderPriority).map(v => ({ value: v, label: PRIORITY_LABEL[v] }));
-  const statusOpts = [{ value: '', label: 'Todos os status' }, ...WORKFLOW_STAGES.map(s => ({ value: s.id, label: s.label }))];
+  const statusOpts = [
+    { value: 'active', label: 'Em Andamento' },
+    { value: '', label: 'Todos os status' },
+    ...WORKFLOW_STAGES.map(s => ({ value: s.id, label: s.label }))
+  ];
+
+  // Contagem de ordens ativas
+  const activeOrdersCount = orders.filter(o => ACTIVE_ORDER_STATUSES.includes(o.status)).length;
 
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Filters */}
       <Card>
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-          <div className="flex gap-3 flex-1">
+          <div className="flex gap-3 flex-1 flex-wrap items-center">
             <div className="relative flex-1 max-w-xs">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input type="text" placeholder="Buscar pedido, cliente..." value={search} onChange={e => setSearch(e.target.value)}
@@ -116,6 +145,11 @@ const OrdersView: React.FC = () => {
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400">
               {statusOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            {statusFilter === 'active' && (
+              <span className="text-xs text-slate-500 bg-brand-50 px-2 py-1 rounded-lg">
+                {activeOrdersCount} {activeOrdersCount === 1 ? 'ordem ativa' : 'ordens ativas'}
+              </span>
+            )}
           </div>
           <Button icon={PlusIcon} onClick={openNew}>Nova Ordem</Button>
         </div>
