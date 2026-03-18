@@ -72,27 +72,27 @@ const AppRoutes: React.FC = () => {
         <ProtectedRoute title="Configurações" roles={['ADMIN']} element={<SettingsView />} />
       } />
 
-      {/* All roles */}
+      {/* All roles (Admin, Manager, Staff) */}
       <Route path="/customers" element={
-        <ProtectedRoute title="Clientes" element={<CustomersView />} />
+        <ProtectedRoute title="Clientes" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<CustomersView />} />
       } />
       <Route path="/orders" element={
-        <ProtectedRoute title="Ordens de Serviço" element={<OrdersView />} />
+        <ProtectedRoute title="Ordens de Serviço" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<OrdersView />} />
       } />
       <Route path="/production" element={
-        <ProtectedRoute title="Produção" element={<ProductionView />} />
+        <ProtectedRoute title="Produção" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<ProductionView />} />
       } />
       <Route path="/inventory" element={
-        <ProtectedRoute title="Peças" element={<InventoryView />} />
+        <ProtectedRoute title="Peças" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<InventoryView />} />
       } />
       <Route path="/brands" element={
-        <ProtectedRoute title="Marcas" element={<BrandsView />} />
+        <ProtectedRoute title="Marcas" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<BrandsView />} />
       } />
       <Route path="/timeclock" element={
-        <ProtectedRoute title="Folha de Ponto" element={<TimeClockView />} />
+        <ProtectedRoute title="Folha de Ponto" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<TimeClockView />} />
       } />
       <Route path="/documentation" element={
-        <ProtectedRoute title="Documentação" element={<DocumentationView />} />
+        <ProtectedRoute title="Documentação" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<DocumentationView />} />
       } />
 
       {/* Catch-all */}
