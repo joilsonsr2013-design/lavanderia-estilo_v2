@@ -16,7 +16,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (res.status === 401) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    window.location.href = '/login';
+    // Usando HashRouter, o redirecionamento deve ser para #/login
+    window.location.hash = '/login';
     throw new Error('Sessão expirada. Faça login novamente.');
   }
   if (!res.ok) {
