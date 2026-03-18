@@ -44,11 +44,11 @@ productRoutes.get('/:id', async (req, res) => {
 
 productRoutes.post('/', requireManagerOrAdmin, async (req, res) => {
   try {
-    const { name, description, sku, price, washAndIronPrice, ironOnlyPrice, stock, minStock, category, unit } = req.body;
+    const { name, description, sku, price, stock, minStock, category, unit } = req.body;
     if (!name || !sku || price === undefined) return res.status(400).json({ error: 'Nome, SKU e preço são obrigatórios' });
 
     const product = await prisma.product.create({
-      data: { name, description, sku, price, washAndIronPrice, ironOnlyPrice, stock: stock || 0, minStock: minStock || 0, category, unit }
+      data: { name, description, sku, price, stock: stock || 0, minStock: minStock || 0, category, unit }
     });
     res.status(201).json(product);
   } catch (error: any) {
@@ -59,10 +59,10 @@ productRoutes.post('/', requireManagerOrAdmin, async (req, res) => {
 
 productRoutes.put('/:id', requireManagerOrAdmin, async (req, res) => {
   try {
-    const { name, description, sku, price, washAndIronPrice, ironOnlyPrice, stock, minStock, category, unit } = req.body;
+    const { name, description, sku, price, stock, minStock, category, unit } = req.body;
     const product = await prisma.product.update({
       where: { id: req.params.id },
-      data: { name, description, sku, price, washAndIronPrice, ironOnlyPrice, stock, minStock, category, unit }
+      data: { name, description, sku, price, stock, minStock, category, unit }
     });
     res.json(product);
   } catch (error: any) {

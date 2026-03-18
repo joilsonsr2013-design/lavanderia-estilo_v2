@@ -25,7 +25,7 @@ orderRoutes.get('/', async (req, res) => {
       orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
       include: {
         customer: true,
-        items: { include: { product: true } },
+        items: { include: { product: true, clothingItem: true } },
         production: { include: { employee: { select: { id: true, name: true, role: true } } } }
       }
     });
@@ -41,7 +41,7 @@ orderRoutes.get('/:id', async (req, res) => {
       where: { id: req.params.id },
       include: {
         customer: true,
-        items: { include: { product: true } },
+        items: { include: { product: true, clothingItem: true } },
         production: { include: { employee: true } }
       }
     });
@@ -69,20 +69,21 @@ orderRoutes.post('/', async (req, res) => {
         dueDate: dueDate ? new Date(dueDate) : null,
         items: {
           create: items.map((item: any) => ({
-            productId: item.productId,
+            productId: item.productId || null,
+            clothingItemId: item.clothingItemId || null,
+            serviceType: item.serviceType || null,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             totalPrice: item.totalPrice,
-            serviceType: item.serviceType,
-            brand: item.brand,
+            description: item.description,
+            fabricType: item.fabricType,
             color: item.color,
             dirtLevel: item.dirtLevel,
-            damageNotes: item.damageNotes,
-            notes: item.notes
+            damageNotes: item.damageNotes
           }))
         }
       },
-      include: { customer: true, items: { include: { product: true } } }
+      include: { customer: true, items: { include: { product: true, clothingItem: true } } }
     });
 
     // Auto-create production entry
@@ -104,7 +105,7 @@ orderRoutes.patch('/:id/status', async (req, res) => {
     const order = await prisma.order.update({
       where: { id: req.params.id },
       data: { status },
-      include: { customer: true, items: { include: { product: true } }, production: true }
+      include: { customer: true, items: { include: { product: true, clothingItem: true } }, production: true }
     });
 
     // Update production stage if status changes
@@ -139,7 +140,7 @@ orderRoutes.put('/:id', requireManagerOrAdmin, async (req, res) => {
         description,
         dueDate: dueDate ? new Date(dueDate) : null
       },
-      include: { customer: true, items: { include: { product: true } } }
+      include: { customer: true, items: { include: { product: true, clothingItem: true } } }
     });
     res.json(order);
   } catch (error: any) {

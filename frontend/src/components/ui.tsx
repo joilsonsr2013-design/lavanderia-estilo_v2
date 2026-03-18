@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { XIcon, AlertIcon, InfoIcon, CheckIcon } from './icons';
+import React, { useState, useRef, useEffect } from 'react';
+import { XIcon, AlertIcon, InfoIcon, CheckIcon, SearchIcon, ChevronDownIcon } from './icons';
 
 // ============ SPINNER ============
 export const Spinner: React.FC<{ size?: 'sm' | 'md' | 'lg'; className?: string }> = ({ size = 'md', className = '' }) => {
@@ -238,3 +238,194 @@ export const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, co
     </div>
   </div>
 );
+
+// ============ SEARCHABLE SELECT ============
+export interface SearchableSelectOption {
+  value: string;
+  label: string;
+}
+
+export interface SearchableSelectGroup {
+  label: string;
+  options: SearchableSelectOption[];
+}
+
+interface SearchableSelectProps {
+  label?: string;
+  value: string;
+  onChange: (value: string) => void;
+  options?: SearchableSelectOption[];
+  groups?: SearchableSelectGroup[];
+  placeholder?: string;
+  searchPlaceholder?: string;
+  required?: boolean;
+  disabled?: boolean;
+  containerClassName?: string;
+  className?: string;
+}
+
+export const SearchableSelect: React.FC<SearchableSelectProps> = ({
+  label,
+  value,
+  onChange,
+  options,
+  groups,
+  placeholder = 'Selecione...',
+  searchPlaceholder = 'Buscar...',
+  required,
+  disabled,
+  containerClassName = '',
+  className = '',
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Find selected label
+  const selectedLabel = (() => {
+    if (options) {
+      const opt = options.find(o => o.value === value);
+      return opt?.label || '';
+    }
+    if (groups) {
+      for (const group of groups) {
+        const opt = group.options.find(o => o.value === value);
+        if (opt) return opt.label;
+      }
+    }
+    return '';
+  })();
+
+  // Filter options/groups based on search
+  const filteredGroups = (() => {
+    if (!groups) return [];
+    const lowerSearch = search.toLowerCase();
+    return groups
+      .map(group => ({
+        ...group,
+        options: group.options.filter(opt =>
+          opt.label.toLowerCase().includes(lowerSearch)
+        ),
+      }))
+      .filter(group => group.options.length > 0);
+  })();
+
+  const filteredOptions = (() => {
+    if (!options) return [];
+    const lowerSearch = search.toLowerCase();
+    return options.filter(opt =>
+      opt.label.toLowerCase().includes(lowerSearch)
+    );
+  })();
+
+  // Close on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+        setSearch('');
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSelect = (val: string) => {
+    onChange(val);
+    setIsOpen(false);
+    setSearch('');
+  };
+
+  return (
+    <div className={`space-y-1 ${containerClassName}`} ref={containerRef}>
+      {label && (
+        <label className="block text-sm font-semibold text-slate-700">
+          {label}
+          {required && <span className="text-red-500 ml-1">*</span>}
+        </label>
+      )}
+      <div className="relative">
+        <button
+          type="button"
+          onClick={() => !disabled && setIsOpen(!isOpen)}
+          disabled={disabled}
+          className={`w-full flex items-center justify-between rounded-xl border ${disabled ? 'bg-slate-100 cursor-not-allowed' : 'bg-slate-50 cursor-pointer hover:border-slate-300'} border-slate-200 px-3 py-2 text-sm text-left focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition ${className}`}
+        >
+          <span className={selectedLabel ? 'text-slate-800' : 'text-slate-400'}>
+            {selectedLabel || placeholder}
+          </span>
+          <ChevronDownIcon className={`h-4 w-4 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        </button>
+
+        {isOpen && (
+          <div className="absolute z-50 mt-1 w-full bg-white rounded-xl border border-slate-200 shadow-lg overflow-hidden">
+            {/* Search input */}
+            <div className="relative border-b border-slate-100">
+              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder={searchPlaceholder}
+                className="w-full pl-9 pr-4 py-2 text-sm focus:outline-none"
+                autoFocus
+              />
+            </div>
+
+            {/* Options */}
+            <div className="max-h-48 overflow-y-auto">
+              {/* Clear option */}
+              {!required && (
+                <button
+                  type="button"
+                  onClick={() => handleSelect('')}
+                  className="w-full text-left px-3 py-2 text-sm text-slate-500 hover:bg-slate-50 italic"
+                >
+                  {placeholder}
+                </button>
+              )}
+
+              {/* Groups */}
+              {filteredGroups.length > 0 && filteredGroups.map(group => (
+                <div key={group.label}>
+                  <div className="px-3 py-1.5 text-xs font-semibold text-slate-500 uppercase bg-slate-50 border-t border-slate-100 first:border-t-0">
+                    {group.label}
+                  </div>
+                  {group.options.map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => handleSelect(opt.value)}
+                      className={`w-full text-left px-3 py-2 text-sm hover:bg-brand-50 ${opt.value === value ? 'bg-brand-50 text-brand-700 font-medium' : 'text-slate-700'}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              ))}
+
+              {/* Simple options */}
+              {filteredOptions.length > 0 && filteredOptions.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleSelect(opt.value)}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-brand-50 ${opt.value === value ? 'bg-brand-50 text-brand-700 font-medium' : 'text-slate-700'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+
+              {/* No results */}
+              {search && filteredGroups.length === 0 && filteredOptions.length === 0 && (
+                <div className="px-3 py-2 text-sm text-slate-500 text-center">
+                  Nenhum resultado encontrado
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};

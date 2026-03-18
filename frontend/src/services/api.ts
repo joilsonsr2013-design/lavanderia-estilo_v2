@@ -16,8 +16,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (res.status === 401) {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
-    // Usando HashRouter, o redirecionamento deve ser para #/login
-    window.location.hash = '/login';
+    window.location.href = '/login';
     throw new Error('Sessão expirada. Faça login novamente.');
   }
   if (!res.ok) {
@@ -64,24 +63,6 @@ export const ordersApi = {
   delete: (id: string) => request<void>(`/api/orders/${id}`, { method: 'DELETE' }),
 };
 
-// ============ BRANDS ============
-export const brandsApi = {
-  list: (search?: string) => request<any[]>(`/api/brands${search ? `?search=${encodeURIComponent(search)}` : ''}`),
-  get: (id: string) => request<any>(`/api/brands/${id}`),
-  create: (data: any) => request<any>('/api/brands', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => request<any>(`/api/brands/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: string) => request<void>(`/api/brands/${id}`, { method: 'DELETE' }),
-};
-
-// ============ CATEGORIES ============
-export const categoriesApi = {
-  list: (search?: string) => request<any[]>(`/api/categories${search ? `?search=${encodeURIComponent(search)}` : ''}`),
-  get: (id: string) => request<any>(`/api/categories/${id}`),
-  create: (data: any) => request<any>('/api/categories', { method: 'POST', body: JSON.stringify(data) }),
-  update: (id: string, data: any) => request<any>(`/api/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
-  delete: (id: string) => request<void>(`/api/categories/${id}`, { method: 'DELETE' }),
-};
-
 // ============ PRODUCTS ============
 export const productsApi = {
   list: (params?: Record<string, string>) => {
@@ -95,6 +76,31 @@ export const productsApi = {
   updateStock: (id: string, quantity: number, operation: 'add' | 'subtract' | 'set') =>
     request<any>(`/api/products/${id}/stock`, { method: 'PATCH', body: JSON.stringify({ quantity, operation }) }),
   delete: (id: string) => request<void>(`/api/products/${id}`, { method: 'DELETE' }),
+};
+
+// ============ CLOTHING ITEMS ============
+export const clothingItemsApi = {
+  list: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<any[]>(`/api/clothing-items${qs}`);
+  },
+  get: (id: string) => request<any>(`/api/clothing-items/${id}`),
+  categories: () => request<string[]>('/api/clothing-items/categories'),
+  create: (data: any) => request<any>('/api/clothing-items', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) => request<any>(`/api/clothing-items/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => request<void>(`/api/clothing-items/${id}`, { method: 'DELETE' }),
+};
+
+// ============ BRANDS ============
+export const brandsApi = {
+  list: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<any[]>(`/api/brands${qs}`);
+  },
+  get: (id: string) => request<any>(`/api/brands/${id}`),
+  create: (data: any) => request<any>('/api/brands', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) => request<any>(`/api/brands/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => request<void>(`/api/brands/${id}`, { method: 'DELETE' }),
 };
 
 // ============ PRODUCTION ============

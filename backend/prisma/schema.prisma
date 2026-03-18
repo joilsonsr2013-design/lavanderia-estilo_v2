@@ -3,8 +3,76 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  CLASSIFICATION
+  WASHING
+  DRYING
+  IRONING
+  INSPECTION
+  PACKAGING
+  READY_FOR_DELIVERY
+  DELIVERED
+  CANCELLED
+}
+
+enum OrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum ProductionStatus {
+  PENDING
+  IN_PROGRESS
+  QUALITY_CHECK
+  COMPLETED
+  ON_HOLD
+}
+
+enum EmployeeRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+}
+
+enum TimeRecordType {
+  CLOCK_IN
+  CLOCK_OUT
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum ServiceType {
+  WASH_IRON
+  IRON_ONLY
+}
+
+model Brand {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  category    String?  // Ex: "Premium", "Popular", "Esportiva"
+  country     String?  // País de origem
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  orderItems  OrderItem[]
+
+  @@map("brands")
 }
 
 model Customer {
@@ -14,7 +82,7 @@ model Customer {
   phone       String
   address     String?
   notes       String?
-  preferences String?
+  preferences Json?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   orders      Order[]
@@ -27,8 +95,8 @@ model Order {
   orderNumber String        @unique @default(cuid())
   customerId  String
   customer    Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  status      String        @default("PENDING")
-  priority    String        @default("MEDIUM")
+  status      OrderStatus   @default(PENDING)
+  priority    OrderPriority @default(MEDIUM)
   totalAmount Float
   description String?
   dueDate     DateTime?
@@ -43,87 +111,77 @@ model Order {
 }
 
 model OrderItem {
-  id          String  @id @default(uuid())
-  orderId     String
-  order       Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  productId   String
-  product     Product @relation(fields: [productId], references: [id])
-  quantity    Int
-  unitPrice   Float
-  totalPrice  Float
-  
-  // Atributos de Lavanderia Profissional (Referenciando Tabelas)
-  serviceType String? // Lavar e Passar, Apenas Passar, Limpeza a Seco, etc.
-  brandId     String?
-  brand       Brand?  @relation(fields: [brandId], references: [id])
-  color       String? // Cor predominante
-  fabric      String? // Tipo de tecido (ex: Algodão, Seda, Linho)
-  dirtLevel   String? // Nível de sujidade (Leve, Médio, Pesado)
-  damageNotes String? // Avarias/Manchas pré-existentes (Check-in)
-  notes       String? // Observações específicas da peça
+  id            String        @id @default(uuid())
+  orderId       String
+  order         Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  // Peça de roupa (novo - principal)
+  clothingItemId String?
+  clothingItem   ClothingItem? @relation(fields: [clothingItemId], references: [id])
+  serviceType    ServiceType?
+  brandId       String?
+  brand         Brand?        @relation(fields: [brandId], references: [id])
+
+  // Produto (existente - para insumos/embalagens)
+  productId     String?
+  product       Product?      @relation(fields: [productId], references: [id])
+
+  quantity      Int
+  unitPrice     Float
+  totalPrice    Float
+  description   String?
+  fabricType    String?
+  color         String?
+  dirtLevel     String?
+  damageNotes   String?
 
   @@index([orderId])
+  @@index([clothingItemId])
   @@index([productId])
   @@index([brandId])
   @@map("order_items")
 }
 
-model Brand {
+model Product {
   id          String      @id @default(uuid())
-  name        String      @unique
+  name        String
   description String?
-  logoUrl     String?
+  sku         String      @unique
+  price       Float
+  stock       Int         @default(0)
+  minStock    Int         @default(0)
+  category    String?
+  unit        String?     @default("un")
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
   orderItems  OrderItem[]
 
-  @@map("brands")
-}
-
-model Category {
-  id          String    @id @default(uuid())
-  name        String    @unique
-  description String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  products    Product[]
-
-  @@map("categories")
-}
-
-model Product {
-  id                String      @id @default(uuid())
-  name              String      // Nome da peça (ex: Camisa Social)
-  description       String?
-  sku               String      @unique
-  
-  // Precificação por Tipo de Serviço
-  price             Float       // Preço base/padrão
-  washAndIronPrice  Float?      // Preço Lavar e Passar
-  ironOnlyPrice     Float?      // Preço Apenas Passar
-  dryCleanPrice     Float?      // Preço Limpeza a Seco
-  
-  // Gestão de Insumos (opcional para peças, obrigatório para produtos de venda/uso)
-  stock             Int         @default(0)
-  minStock          Int         @default(0)
-  
-  categoryId        String?
-  category          Category?   @relation(fields: [categoryId], references: [id])
-  unit              String?     @default("pç") // pç, un, kg, m2
-  
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-  orderItems        OrderItem[]
-
-  @@index([categoryId])
   @@map("products")
+}
+
+model ClothingItem {
+  id            String      @id @default(uuid())
+  name          String
+  category      String
+  subcategory   String?
+  priceWashIron Float
+  priceIronOnly Float
+  estimatedTime Int?
+  notes         String?
+  active        Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  orderItems    OrderItem[]
+
+  @@index([category])
+  @@map("clothing_items")
 }
 
 model Production {
   id         String           @id @default(uuid())
   orderId    String
   order      Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  status     String           @default("PENDING")
+  status     ProductionStatus @default(PENDING)
   assignedTo String?
   employee   Employee?        @relation(fields: [assignedTo], references: [id])
   startDate  DateTime?
@@ -144,8 +202,8 @@ model Employee {
   name        String
   email       String         @unique
   phone       String?
-  role        String         @default("STAFF")
-  status      String         @default("ACTIVE")
+  role        EmployeeRole   @default(STAFF)
+  status      EmployeeStatus @default(ACTIVE)
   department  String?
   hireDate    DateTime       @default(now())
   salary      Float?
@@ -162,7 +220,7 @@ model TimeRecord {
   id         String         @id @default(uuid())
   employeeId String
   employee   Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  type       String
+  type       TimeRecordType
   timestamp  DateTime       @default(now())
   notes      String?
 
@@ -173,7 +231,7 @@ model TimeRecord {
 
 model Transaction {
   id          String          @id @default(uuid())
-  type        String
+  type        TransactionType
   category    String
   amount      Float
   description String?

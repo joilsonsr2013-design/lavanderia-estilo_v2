@@ -7,6 +7,31 @@ export interface AuthEmployee {
   department?: string;
 }
 
+// ============ CLOTHING ITEM ============
+export interface ClothingItem {
+  id: string;
+  name: string;
+  category: string;
+  subcategory?: string;
+  priceWashIron: number;
+  priceIronOnly: number;
+  estimatedTime?: number;
+  notes?: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export enum ServiceType {
+  WASH_IRON = 'WASH_IRON',
+  IRON_ONLY = 'IRON_ONLY',
+}
+
+export const SERVICE_TYPE_LABEL: Record<ServiceType, string> = {
+  [ServiceType.WASH_IRON]: 'Lavar e Passar',
+  [ServiceType.IRON_ONLY]: 'Passar',
+};
+
 // ============ CUSTOMER ============
 export interface Customer {
   id: string;
@@ -21,27 +46,6 @@ export interface Customer {
   _count?: { orders: number };
 }
 
-// ============ BRAND ============
-export interface Brand {
-  id: string;
-  name: string;
-  description?: string;
-  logoUrl?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  _count?: { orderItems: number };
-}
-
-// ============ CATEGORY ============
-export interface Category {
-  id: string;
-  name: string;
-  description?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  _count?: { products: number };
-}
-
 // ============ PRODUCT / INVENTORY ============
 export interface Product {
   id: string;
@@ -49,13 +53,9 @@ export interface Product {
   description?: string;
   sku: string;
   price: number;
-  washAndIronPrice?: number;
-  ironOnlyPrice?: number;
-  dryCleanPrice?: number;
   stock: number;
   minStock: number;
-  categoryId?: string;
-  category?: Category;
+  category?: string;
   unit?: string;
   isLowStock?: boolean;
   createdAt?: string;
@@ -105,21 +105,35 @@ export enum DirtLevel {
   HEAVY  = 'Pesado',
 }
 
+// ============ BRAND ============
+export interface Brand {
+  id: string;
+  name: string;
+  category?: string;
+  country?: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+  _count?: { orderItems: number };
+}
+
 export interface OrderItem {
   id?: string;
-  productId: string;
+  productId?: string;
   product?: Product;
+  clothingItemId?: string;
+  clothingItem?: ClothingItem;
+  serviceType?: ServiceType;
+  brandId?: string;
+  brand?: Brand;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
-  serviceType?: string;
-  brandId?: string;
-  brand?: Brand;
+  description?: string;
+  fabricType?: string;
   color?: string;
-  fabric?: string;
   dirtLevel?: string;
   damageNotes?: string;
-  notes?: string;
 }
 
 export interface Order {

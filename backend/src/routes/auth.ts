@@ -26,10 +26,13 @@ authRoutes.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Credenciais inválidas' });
     }
 
+    const jwtSecret = process.env.JWT_SECRET || 'dev-secret';
+    const jwtExpiresIn = process.env.JWT_EXPIRES_IN || '8h';
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const token = jwt.sign(
       { employeeId: employee.id, role: employee.role, name: employee.name },
-      process.env.JWT_SECRET || 'dev-secret',
-      { expiresIn: process.env.JWT_EXPIRES_IN || '8h' }
+      jwtSecret,
+      { expiresIn: jwtExpiresIn as any }
     );
 
     res.json({

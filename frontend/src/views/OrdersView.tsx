@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { Card, Button, Input, Select, Textarea, Modal, Alert, EmptyState, LoadingState, Badge } from '../components/ui';
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon, OrdersIcon, ChevronRightIcon, AlertIcon, CalendarIcon, FilterIcon, TagIcon } from '../components/icons';
+import React, { useState, useEffect } from 'react';
+import { Card, Button, Input, Select, Textarea, Modal, Alert, EmptyState, LoadingState, Badge, SearchableSelect } from '../components/ui';
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon, OrdersIcon, ChevronRightIcon, AlertIcon, CalendarIcon, FilterIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ordersApi } from '../services/api';
+import { ordersApi, productsApi } from '../services/api';
 import { formatDate, formatCurrency, isOverdue, daysUntil } from '../utils/helpers';
-import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL, WORKFLOW_STAGES, FINAL_STATUSES, ITEM_COLORS, DIRT_LEVELS } from '../constants';
-import { OrderStatus, OrderPriority, type Order } from '../types';
+import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL, WORKFLOW_STAGES, FINAL_STATUSES, FABRIC_TYPES, ITEM_COLORS, DIRT_LEVELS } from '../constants';
+import { OrderStatus, OrderPriority, ServiceType, SERVICE_TYPE_LABEL, type Order, type Product, type ClothingItem, type Brand } from '../types';
 
+// Status que representam ordens ativas (em andamento)
 const ACTIVE_ORDER_STATUSES = [
   OrderStatus.PENDING,
   OrderStatus.CLASSIFICATION,
@@ -19,11 +20,20 @@ const ACTIVE_ORDER_STATUSES = [
   OrderStatus.READY_FOR_DELIVERY,
 ];
 
-const FABRICS = ['Algodão', 'Seda', 'Linho', 'Sintético', 'Lã', 'Couro', 'Veludo', 'Pluma de Ganso', 'Outro'];
-const SERVICES = ['Lavar e Passar', 'Apenas Passar', 'Limpeza a Seco', 'Tratamento de Manchas'];
+interface OrderFormItem {
+  clothingItemId: string;
+  serviceType: ServiceType;
+  brandId: string;
+  quantity: number;
+  unitPrice: number;
+  fabricType: string;
+  color: string;
+  dirtLevel: string;
+  damageNotes: string;
+}
 
 const OrdersView: React.FC = () => {
-  const { orders, customers, inventory, brands, refreshOrders } = useAppContext();
+  const { orders, customers, clothingItems, brands, loadingClothingItems, loadingBrands, refreshOrders } = useAppContext();
   const { canManage } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
@@ -39,182 +49,242 @@ const OrdersView: React.FC = () => {
   const [priority, setPriority] = useState<OrderPriority>(OrderPriority.MEDIUM);
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [items, setItems] = useState<{ 
-    productId: string; 
-    quantity: number; 
-    unitPrice: number; 
-    serviceType: string;
-    brandId: string;
-    color: string; 
-    fabric: string;
-    dirtLevel: string; 
-    damageNotes: string;
-    notes: string;
-  }[]>([
-    { productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brandId: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }
+  const [items, setItems] = useState<OrderFormItem[]>([
+    { clothingItemId: '', serviceType: ServiceType.WASH_IRON, brandId: '', quantity: 1, unitPrice: 0, fabricType: '', color: '', dirtLevel: 'Leve', damageNotes: '' }
   ]);
 
-  const servicesList = inventory.filter(p => p.category?.name !== 'Insumos' && p.category?.name !== 'Embalagem');
+  // Active clothing items (only active ones)
+  const activeClothingItems = clothingItems.filter(item => item.active);
+  // Active brands
+  const activeBrands = brands.filter(brand => brand.active);
 
   const filtered = orders.filter(o => {
     const matchSearch = !search || o.orderNumber?.toLowerCase().includes(search.toLowerCase()) || o.customer?.name?.toLowerCase().includes(search.toLowerCase());
+
     let matchStatus = true;
-    if (statusFilter === 'active') matchStatus = ACTIVE_ORDER_STATUSES.includes(o.status);
-    else if (statusFilter) matchStatus = o.status === statusFilter;
+    if (statusFilter === 'active') {
+      matchStatus = ACTIVE_ORDER_STATUSES.includes(o.status);
+    } else if (statusFilter) {
+      matchStatus = o.status === statusFilter;
+    }
+
     return matchSearch && matchStatus;
   });
 
   const total = items.reduce((s, i) => s + (i.quantity * i.unitPrice), 0);
 
-  const addItem = () => setItems(prev => [...prev, { productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brandId: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }]);
+  const addItem = () => setItems(prev => [...prev, { clothingItemId: '', serviceType: ServiceType.WASH_IRON, brandId: '', quantity: 1, unitPrice: 0, fabricType: '', color: '', dirtLevel: 'Leve', damageNotes: '' }]);
   const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
+
   const updateItem = (idx: number, field: string, value: any) => {
     setItems(prev => {
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: value };
-      
-      if (field === 'productId' || field === 'serviceType') {
-        const prodId = field === 'productId' ? value : next[idx].productId;
-        const srvType = field === 'serviceType' ? value : next[idx].serviceType;
-        const prod = inventory.find(p => p.id === prodId);
-        
-        if (prod) {
-          if (srvType === 'Apenas Passar' && prod.ironOnlyPrice) next[idx].unitPrice = prod.ironOnlyPrice;
-          else if (srvType === 'Limpeza a Seco' && prod.dryCleanPrice) next[idx].unitPrice = prod.dryCleanPrice;
-          else next[idx].unitPrice = prod.washAndIronPrice || prod.price;
+
+      // Auto-fill price when clothing item or service type changes
+      if (field === 'clothingItemId' || field === 'serviceType') {
+        const item = clothingItems.find(c => c.id === next[idx].clothingItemId);
+        if (item) {
+          next[idx].unitPrice = next[idx].serviceType === ServiceType.WASH_IRON ? item.priceWashIron : item.priceIronOnly;
         }
       }
+
       return next;
     });
   };
 
   const openNew = () => {
-    setCustomerId(''); setPriority(OrderPriority.MEDIUM); setDescription(''); setDueDate('');
-    setItems([{ productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brandId: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }]);
-    setError(''); setModal(true);
+    setCustomerId('');
+    setPriority(OrderPriority.MEDIUM);
+    setDescription('');
+    setDueDate('');
+    setItems([{ clothingItemId: '', serviceType: ServiceType.WASH_IRON, brandId: '', quantity: 1, unitPrice: 0, fabricType: '', color: '', dirtLevel: 'Leve', damageNotes: '' }]);
+    setError('');
+    setModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); setSaving(true); setError('');
+    e.preventDefault();
+    setSaving(true);
+    setError('');
     try {
-      const validItems = items.filter(i => i.productId && i.quantity > 0);
+      const validItems = items.filter(i => i.clothingItemId && i.quantity > 0);
       if (!customerId) throw new Error('Selecione um cliente');
       if (validItems.length === 0) throw new Error('Adicione pelo menos uma peça');
-      
+
       await ordersApi.create({
-        customerId, priority, description, dueDate: dueDate || undefined,
+        customerId,
+        priority,
+        description,
+        dueDate: dueDate || undefined,
         totalAmount: total,
-        items: validItems.map(i => ({ 
-          productId: i.productId, 
-          quantity: i.quantity, 
-          unitPrice: i.unitPrice, 
-          totalPrice: i.quantity * i.unitPrice, 
+        items: validItems.map(i => ({
+          clothingItemId: i.clothingItemId,
           serviceType: i.serviceType,
           brandId: i.brandId || undefined,
-          color: i.color, 
-          fabric: i.fabric,
-          dirtLevel: i.dirtLevel, 
-          damageNotes: i.damageNotes,
-          notes: i.notes
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          totalPrice: i.quantity * i.unitPrice,
+          fabricType: i.fabricType,
+          color: i.color,
+          dirtLevel: i.dirtLevel,
+          damageNotes: i.damageNotes
         }))
       });
-      await refreshOrders(); setModal(false);
-    } catch (err: any) { setError(err.message); }
-    finally { setSaving(false); }
+      await refreshOrders();
+      setModal(false);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleAdvanceStatus = async (order: Order) => {
     const next = NEXT_STATUS[order.status];
     if (!next) return;
     setAdvancingId(order.id);
-    try { await ordersApi.updateStatus(order.id, next); await refreshOrders(); }
-    catch (err: any) { alert(err.message); }
-    finally { setAdvancingId(null); }
+    try {
+      await ordersApi.updateStatus(order.id, next);
+      await refreshOrders();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setAdvancingId(null);
+    }
   };
+
+  const handleCancel = async (order: Order) => {
+    if (!confirm('Cancelar este pedido?')) return;
+    try {
+      await ordersApi.updateStatus(order.id, OrderStatus.CANCELLED);
+      await refreshOrders();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!canManage) return;
+    if (!confirm('Excluir este pedido permanentemente?')) return;
+    try {
+      await ordersApi.delete(id);
+      await refreshOrders();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const priorityOpts = Object.values(OrderPriority).map(v => ({ value: v, label: PRIORITY_LABEL[v] }));
+  const statusOpts = [
+    { value: 'active', label: 'Em Andamento' },
+    { value: '', label: 'Todos os status' },
+    ...WORKFLOW_STAGES.map(s => ({ value: s.id, label: s.label }))
+  ];
+  const serviceTypeOpts = [
+    { value: ServiceType.WASH_IRON, label: 'Lavar e Passar' },
+    { value: ServiceType.IRON_ONLY, label: 'Passar' }
+  ];
+
+  // Group clothing items by category
+  const clothingItemsByCategory = activeClothingItems.reduce((acc, item) => {
+    if (!acc[item.category]) acc[item.category] = [];
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<string, ClothingItem[]>);
+
+  const activeOrdersCount = orders.filter(o => ACTIVE_ORDER_STATUSES.includes(o.status)).length;
 
   return (
     <div className="space-y-4 animate-fade-in">
-      {/* Header */}
+      {/* Filters */}
       <Card>
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="flex gap-3 flex-1 flex-wrap items-center">
             <div className="relative flex-1 max-w-xs">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
               <input type="text" placeholder="Buscar pedido, cliente..." value={search} onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                className="w-full pl-9 pr-4 py-2 rounded-xl border border-slate-200 bg-slate-50 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400" />
             </div>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="active">Em Andamento</option>
-              <option value="">Todos os status</option>
-              {WORKFLOW_STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400">
+              {statusOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            {statusFilter === 'active' && (
+              <span className="text-xs text-slate-500 bg-brand-50 px-2 py-1 rounded-lg">
+                {activeOrdersCount} {activeOrdersCount === 1 ? 'ordem ativa' : 'ordens ativas'}
+              </span>
+            )}
           </div>
-          {canManage && <Button onClick={openNew} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"><PlusIcon className="h-4 w-4" /> Novo Rol</Button>}
+          <Button icon={PlusIcon} onClick={openNew}>Nova Ordem</Button>
         </div>
       </Card>
 
-      {/* Info Card */}
-      <Card className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-100">
-        <div className="flex items-start gap-4">
-          <div className="text-3xl">📋</div>
-          <div className="flex-1">
-            <h3 className="font-bold text-slate-900 mb-1">Ordens de Serviço (Rols de Roupas)</h3>
-            <p className="text-sm text-slate-600">
-              Crie novos rols de roupas selecionando peças do catálogo, marcas, cores, tecidos e nível de sujeira. Cada peça pode ter um serviço diferente (Lavar e Passar, Apenas Passar, Limpeza a Seco).
-            </p>
-          </div>
-          <Badge className="bg-purple-600 text-white whitespace-nowrap">{filtered.length} ativo(s)</Badge>
-        </div>
-      </Card>
-
+      {/* Orders table */}
       {filtered.length === 0 ? (
-        <Card><EmptyState icon={OrdersIcon} message="Nenhum rol de roupas encontrado." action={canManage ? <Button onClick={openNew} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg"><PlusIcon className="h-4 w-4" /> Criar Rol</Button> : undefined} /></Card>
+        <Card><EmptyState icon={OrdersIcon} message="Nenhuma ordem encontrada." action={<Button icon={PlusIcon} onClick={openNew}>Criar Ordem</Button>} /></Card>
       ) : (
         <Card padding={false}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50">
-                  {['Rol Nº', 'Cliente', 'Status', 'Prazo', 'Total', 'Ações'].map(h => (
+                <tr className="border-b border-slate-100">
+                  {['Nº Pedido', 'Cliente', 'Status', 'Prioridade', 'Prazo', 'Valor', 'Ações'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider first:pl-5 last:pr-5">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filtered.map(order => (
-                  <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-3">
-                      <button onClick={() => { setSelectedOrder(order); setDetailModal(true); }}
-                        className="font-mono text-xs font-bold text-blue-600 hover:underline">
-                        #{order.orderNumber?.slice(-8).toUpperCase()}
-                      </button>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-700">{order.customer?.name}</td>
-                    <td className="px-4 py-3">
-                      <Badge color={`${STATUS_BG[order.status]} ${STATUS_COLOR[order.status]}`}>
-                        {STATUS_LABEL[order.status]}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs font-semibold ${isOverdue(order.dueDate) ? 'text-red-600' : 'text-slate-600'}`}>
-                        {formatDate(order.dueDate)}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm font-semibold text-slate-700">{formatCurrency(order.totalAmount)}</td>
-                    <td className="px-5 py-3">
-                      <div className="flex items-center gap-1">
-                        {NEXT_STATUS[order.status] && (
-                          <Button size="sm" variant="primary" isLoading={advancingId === order.id}
-                            onClick={() => handleAdvanceStatus(order)} title={NEXT_STATUS_LABEL[order.status]}>
-                            <ChevronRightIcon className="h-3 w-3" />
-                            <span className="hidden sm:inline text-xs">{NEXT_STATUS_LABEL[order.status]?.split(' ')[0]}</span>
-                          </Button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {filtered.map(order => {
+                  const overdue = isOverdue(order.dueDate) && !FINAL_STATUSES.includes(order.status);
+                  const days = daysUntil(order.dueDate);
+                  const nextStatus = NEXT_STATUS[order.status];
+                  return (
+                    <tr key={order.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-3">
+                        <button onClick={() => { setSelectedOrder(order); setDetailModal(true); }}
+                          className="font-mono text-xs font-bold text-brand-600 hover:underline">
+                          #{order.orderNumber?.slice(-8).toUpperCase()}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{order.customer?.name || '-'}</td>
+                      <td className="px-4 py-3">
+                        <Badge color={`${STATUS_BG[order.status]} ${STATUS_COLOR[order.status]}`}>
+                          {STATUS_LABEL[order.status] || order.status}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        {order.priority && <Badge color={PRIORITY_COLOR[order.priority]}>{PRIORITY_LABEL[order.priority]}</Badge>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {order.dueDate ? (
+                          <span className={`text-xs font-semibold flex items-center gap-1 ${overdue ? 'text-red-600' : days !== null && days <= 1 ? 'text-amber-600' : 'text-slate-600'}`}>
+                            {overdue && <AlertIcon className="h-3 w-3" />}
+                            {formatDate(order.dueDate)}
+                          </span>
+                        ) : <span className="text-xs text-slate-400">-</span>}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-slate-700">{formatCurrency(order.totalAmount)}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-1">
+                          {nextStatus && (
+                            <Button size="sm" variant="primary" isLoading={advancingId === order.id}
+                              onClick={() => handleAdvanceStatus(order)} title={NEXT_STATUS_LABEL[order.status]}>
+                              <ChevronRightIcon className="h-3 w-3" />
+                              <span className="hidden sm:inline text-xs">{NEXT_STATUS_LABEL[order.status]?.split(' ')[0]}</span>
+                            </Button>
+                          )}
+                          {!FINAL_STATUSES.includes(order.status) && (
+                            <Button size="sm" variant="ghost" onClick={() => handleCancel(order)} className="text-red-400 hover:text-red-600" title="Cancelar">✕</Button>
+                          )}
+                          {canManage && (
+                            <Button size="sm" variant="ghost" onClick={() => handleDelete(order.id)} className="text-slate-400" title="Excluir"><TrashIcon className="h-3 w-3" /></Button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -222,132 +292,154 @@ const OrdersView: React.FC = () => {
       )}
 
       {/* NEW ORDER MODAL */}
-      <Modal isOpen={modal} onClose={() => setModal(false)} title="Check-in: Novo Rol de Roupas" size="xl"
-        footer={<div className="flex justify-between items-center w-full">
-          <div className="text-lg font-bold text-slate-800">Total: {formatCurrency(total)}</div>
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => setModal(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} isLoading={saving} className="bg-blue-600 hover:bg-blue-700 text-white">Gerar Rol</Button>
-          </div>
-        </div>}>
+      <Modal isOpen={modal} onClose={() => setModal(false)} title="Nova Ordem de Serviço" size="xl"
+        footer={<>
+          <Button variant="outline" onClick={() => setModal(false)}>Cancelar</Button>
+          <Button type="submit" form="orderForm" isLoading={saving}>Criar Ordem — {formatCurrency(total)}</Button>
+        </>}>
         {error && <Alert type="error" message={error} className="mb-4" />}
-        <form className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Select label="Cliente *" required value={customerId} onChange={e => setCustomerId(e.target.value)}
-              options={customers.map(c => ({ value: c.id, label: c.name }))} placeholder="Selecione o cliente" />
-            <Select label="Prioridade" value={priority} onChange={e => setPriority(e.target.value as OrderPriority)} 
-              options={Object.values(OrderPriority).map(v => ({ value: v, label: PRIORITY_LABEL[v] }))} />
-            <Input label="Previsão de Entrega" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"><TagIcon className="h-4 w-4" /> Detalhamento das Peças</h4>
-              <Button type="button" size="sm" variant="outline" onClick={addItem} className="flex items-center gap-1"><PlusIcon className="h-3 w-3" /> Adicionar Peça</Button>
+        {loadingClothingItems ? <LoadingState /> : (
+          <form id="orderForm" onSubmit={handleSubmit} className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <Select label="Cliente" value={customerId} onChange={e => setCustomerId(e.target.value)} required
+                options={customers.map(c => ({ value: c.id, label: c.name }))} placeholder="Selecione um cliente" containerClassName="col-span-2 sm:col-span-1" />
+              <Select label="Prioridade" value={priority} onChange={e => setPriority(e.target.value as OrderPriority)}
+                options={priorityOpts} containerClassName="col-span-2 sm:col-span-1" />
+              <Input label="Prazo de Entrega" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} containerClassName="col-span-2 sm:col-span-1" />
+              <Input label="Observações" value={description} onChange={e => setDescription(e.target.value)} placeholder="Observações gerais..." containerClassName="col-span-2 sm:col-span-1" />
             </div>
-            
-            <div className="space-y-4">
-              {items.map((item, idx) => (
-                <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 relative group">
-                  <button type="button" onClick={() => removeItem(idx)} className="absolute -top-2 -right-2 bg-white text-red-500 p-1.5 rounded-full shadow-md hover:bg-red-50 transition-colors">
-                    <TrashIcon className="h-4 w-4" />
-                  </button>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-                    <div className="md:col-span-2">
-                      <Select label="Peça / Serviço *" required value={item.productId} onChange={e => updateItem(idx, 'productId', e.target.value)}
-                        options={servicesList.map(p => ({ value: p.id, label: p.name }))} placeholder="Selecione a peça" />
-                    </div>
-                    <Input label="Qtd" type="number" min="1" value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value))} />
-                    <Input label="Preço Unit. (R$)" type="number" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', parseFloat(e.target.value))} />
-                  </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <Select label="Serviço" value={item.serviceType} onChange={e => updateItem(idx, 'serviceType', e.target.value)}
-                      options={SERVICES.map(s => ({ value: s, label: s }))} />
-                    <Select label="Marca" value={item.brandId} onChange={e => updateItem(idx, 'brandId', e.target.value)}
-                      options={[{ value: '', label: 'Sem marca' }, ...brands.map(b => ({ value: b.id, label: b.name }))]} />
-                    <Select label="Cor" value={item.color} onChange={e => updateItem(idx, 'color', e.target.value)}
-                      options={[{ value: '', label: 'Selecione' }, ...ITEM_COLORS.map(c => ({ value: c, label: c }))]} />
-                    <Select label="Tecido" value={item.fabric} onChange={e => updateItem(idx, 'fabric', e.target.value)}
-                      options={[{ value: '', label: 'Selecione' }, ...FABRICS.map(f => ({ value: f, label: f }))]} />
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
-                    <Select label="Nível de Sujeira" value={item.dirtLevel} onChange={e => updateItem(idx, 'dirtLevel', e.target.value)}
-                      options={DIRT_LEVELS.map(d => ({ value: d, label: d }))} />
-                    <Input label="Avarias / Manchas (Check-in)" placeholder="Ex: Mancha de vinho na manga esquerda" value={item.damageNotes} onChange={e => updateItem(idx, 'damageNotes', e.target.value)} />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-1">
-            <label className="block text-sm font-bold text-slate-700">Observações Gerais do Rol</label>
-            <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Instruções especiais para este pedido..." />
-          </div>
-        </form>
-      </Modal>
-
-      {/* ORDER DETAILS MODAL */}
-      {selectedOrder && (
-        <Modal isOpen={detailModal} onClose={() => setDetailModal(false)} title={`Rol #${selectedOrder.orderNumber?.slice(-8).toUpperCase()}`} size="xl">
-          <div className="space-y-6">
-            <div className="flex justify-between items-start border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-xl font-bold text-slate-900">{selectedOrder.customer?.name}</h3>
-                <p className="text-sm text-slate-500">{selectedOrder.customer?.phone} • {selectedOrder.customer?.email}</p>
-                <div className="flex gap-2 mt-2">
-                  <Badge color={`${STATUS_BG[selectedOrder.status]} ${STATUS_COLOR[selectedOrder.status]}`}>{STATUS_LABEL[selectedOrder.status]}</Badge>
-                  <Badge color={PRIORITY_COLOR[selectedOrder.priority || 'MEDIUM']}>{PRIORITY_LABEL[selectedOrder.priority || 'MEDIUM']}</Badge>
-                </div>
+            <div>
+              <div className="flex justify-between items-center mb-3">
+                <label className="text-sm font-bold text-slate-700">Peças de Roupa</label>
+                <Button type="button" variant="outline" size="sm" icon={PlusIcon} onClick={addItem}>Adicionar Peça</Button>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Total do Rol</p>
-                <p className="text-2xl font-black text-blue-600">{formatCurrency(selectedOrder.totalAmount)}</p>
-                <p className="text-xs text-slate-500 mt-1">Previsão: {formatDate(selectedOrder.dueDate)}</p>
-              </div>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="font-bold text-slate-800 text-sm uppercase tracking-widest">Peças no Rol</h4>
-              <div className="grid grid-cols-1 gap-3">
-                {selectedOrder.items?.map((item, idx) => (
-                  <div key={idx} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="w-6 h-6 flex items-center justify-center bg-blue-100 text-blue-700 rounded-full text-xs font-bold">{item.quantity}x</span>
-                        <h5 className="font-bold text-slate-800">{item.product?.name}</h5>
-                        <Badge variant="outline" className="text-[10px]">{item.serviceType}</Badge>
+              <div className="space-y-3">
+                {items.map((item, idx) => (
+                  <div key={idx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <SearchableSelect
+                        label="Peça"
+                        value={item.clothingItemId}
+                        onChange={(val) => updateItem(idx, 'clothingItemId', val)}
+                        groups={Object.entries(clothingItemsByCategory).map(([category, items]) => ({
+                          label: category,
+                          options: items.map(i => ({
+                            value: i.id,
+                            label: i.name + (i.subcategory ? ` (${i.subcategory})` : '')
+                          }))
+                        }))}
+                        placeholder="Selecione uma peça..."
+                        searchPlaceholder="Buscar peça..."
+                        required
+                      />
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Serviço</label>
+                        <select value={item.serviceType} onChange={e => updateItem(idx, 'serviceType', e.target.value as ServiceType)}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400">
+                          {serviceTypeOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
                       </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
-                        {item.brand && <span><strong className="text-slate-700">Marca:</strong> {item.brand.name}</span>}
-                        {item.color && <span><strong className="text-slate-700">Cor:</strong> {item.color}</span>}
-                        {item.fabric && <span><strong className="text-slate-700">Tecido:</strong> {item.fabric}</span>}
-                        {item.dirtLevel && <span><strong className="text-slate-700">Sujeira:</strong> {item.dirtLevel}</span>}
-                      </div>
-                      {item.damageNotes && (
-                        <div className="mt-2 p-2 bg-red-50 rounded text-xs text-red-700 border border-red-100">
-                          <strong>⚠️ Avarias:</strong> {item.damageNotes}
-                        </div>
-                      )}
+                      <SearchableSelect
+                        label="Marca"
+                        value={item.brandId}
+                        onChange={(val) => updateItem(idx, 'brandId', val)}
+                        options={activeBrands.map(b => ({ value: b.id, label: b.name }))}
+                        placeholder="Selecione..."
+                        searchPlaceholder="Buscar marca..."
+                      />
                     </div>
-                    <div className="mt-3 md:mt-0 md:text-right">
-                      <p className="text-sm font-bold text-slate-700">{formatCurrency(item.totalPrice)}</p>
-                      <p className="text-[10px] text-slate-400">{formatCurrency(item.unitPrice)} / un</p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <Input label="Qtd" type="number" min={1} value={item.quantity} onChange={e => updateItem(idx, 'quantity', Number(e.target.value))} />
+                      <Input label="Preço Unit." type="number" step="0.01" min={0} value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', Number(e.target.value))} />
+                      <div className="flex items-end">
+                        <span className="text-xs text-slate-500 font-semibold pb-2">Subtotal: {formatCurrency(item.quantity * item.unitPrice)}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <Select label="Tipo de Tecido" value={item.fabricType} onChange={e => updateItem(idx, 'fabricType', e.target.value)}
+                        options={FABRIC_TYPES.map(f => ({ value: f, label: f }))} placeholder="Tipo..." />
+                      <Select label="Cor" value={item.color} onChange={e => updateItem(idx, 'color', e.target.value)}
+                        options={ITEM_COLORS.map(c => ({ value: c, label: c }))} placeholder="Cor..." />
+                      <Select label="Sujidade" value={item.dirtLevel} onChange={e => updateItem(idx, 'dirtLevel', e.target.value)}
+                        options={DIRT_LEVELS.map(d => ({ value: d, label: d }))} placeholder="Nível..." />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Input label="Observações" value={item.damageNotes} onChange={e => updateItem(idx, 'damageNotes', e.target.value)} placeholder="Danos, manchas..." containerClassName="flex-1 mr-3" />
+                      {items.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(idx)} className="text-red-400"><TrashIcon className="h-3 w-3" /></Button>}
                     </div>
                   </div>
                 ))}
               </div>
+              <div className="flex justify-end mt-3 p-3 bg-brand-50 rounded-xl">
+                <p className="font-bold text-brand-700">Total: {formatCurrency(total)}</p>
+              </div>
             </div>
+          </form>
+        )}
+      </Modal>
 
-            {selectedOrder.description && (
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
-                <h4 className="text-xs font-bold text-amber-800 uppercase mb-1">📝 Observações do Rol</h4>
-                <p className="text-sm text-amber-900">{selectedOrder.description}</p>
+      {/* DETAIL MODAL */}
+      {selectedOrder && (
+        <Modal isOpen={detailModal} onClose={() => setDetailModal(false)} title={`Pedido #${selectedOrder.orderNumber?.slice(-8).toUpperCase()}`} size="lg">
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge color={`${STATUS_BG[selectedOrder.status]} ${STATUS_COLOR[selectedOrder.status]}`}>{STATUS_LABEL[selectedOrder.status]}</Badge>
+              {selectedOrder.priority && <Badge color={PRIORITY_COLOR[selectedOrder.priority]}>{PRIORITY_LABEL[selectedOrder.priority]}</Badge>}
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="font-semibold text-slate-600">Cliente:</span> <span>{selectedOrder.customer?.name}</span></div>
+              <div><span className="font-semibold text-slate-600">Total:</span> <span>{formatCurrency(selectedOrder.totalAmount)}</span></div>
+              {selectedOrder.dueDate && <div><span className="font-semibold text-slate-600">Prazo:</span> <span>{formatDate(selectedOrder.dueDate)}</span></div>}
+              {selectedOrder.description && <div className="col-span-2"><span className="font-semibold text-slate-600">Obs.:</span> <span>{selectedOrder.description}</span></div>}
+            </div>
+            {selectedOrder.items && selectedOrder.items.length > 0 && (
+              <div>
+                <p className="font-bold text-slate-700 mb-2 text-sm">Itens:</p>
+                <div className="space-y-2">
+                  {selectedOrder.items.map((item, i) => (
+                    <div key={i} className="flex justify-between items-center p-3 bg-slate-50 rounded-xl text-sm">
+                      <div>
+                        <p className="font-semibold text-slate-700">
+                          {item.clothingItem?.name || item.product?.name || 'Item'} × {item.quantity}
+                          {item.serviceType && <span className="text-xs text-slate-500 ml-2">({SERVICE_TYPE_LABEL[item.serviceType as ServiceType] || item.serviceType})</span>}
+                        </p>
+                        <p className="text-xs text-slate-500">{[item.fabricType, item.color, item.dirtLevel].filter(Boolean).join(' • ')}</p>
+                        {item.damageNotes && <p className="text-xs text-red-500">{item.damageNotes}</p>}
+                      </div>
+                      <span className="font-bold text-slate-700">{formatCurrency(item.totalPrice)}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
+            {/* Workflow progress */}
+            <div>
+              <p className="font-bold text-slate-700 mb-2 text-sm">Progresso:</p>
+              <div className="flex items-center gap-1 overflow-x-auto pb-2">
+                {WORKFLOW_STAGES.filter(s => s.id !== OrderStatus.CANCELLED).map((stage, i) => {
+                  const stages = Object.values(OrderStatus).filter(s => s !== OrderStatus.CANCELLED);
+                  const currentIdx = stages.indexOf(selectedOrder.status);
+                  const stageIdx = stages.indexOf(stage.id);
+                  const isDone = stageIdx < currentIdx;
+                  const isCurrent = stageIdx === currentIdx;
+                  return (
+                    <React.Fragment key={stage.id}>
+                      <div className={`shrink-0 flex flex-col items-center`}>
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                          ${isDone ? 'bg-green-500 text-white' : isCurrent ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                          {isDone ? '✓' : i + 1}
+                        </div>
+                        <span className={`text-xs mt-1 whitespace-nowrap ${isCurrent ? 'text-brand-600 font-bold' : 'text-slate-400'}`}>{stage.label}</span>
+                      </div>
+                      {i < WORKFLOW_STAGES.filter(s => s.id !== OrderStatus.CANCELLED).length - 1 && (
+                        <div className={`flex-1 h-0.5 min-w-[8px] ${isDone ? 'bg-green-400' : 'bg-slate-200'}`} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </Modal>
       )}

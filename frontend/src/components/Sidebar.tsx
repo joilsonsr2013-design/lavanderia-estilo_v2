@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { DashboardIcon, UsersIcon, OrdersIcon, ProductionIcon, PackageIcon, FinanceIcon, ClockIcon, EmployeesIcon, SettingsIcon, DocsIcon, LogoutIcon, WashIcon, UserIcon, BrandIcon } from './icons';
+import { DashboardIcon, UsersIcon, OrdersIcon, ProductionIcon, PackageIcon, FinanceIcon, ClockIcon, EmployeesIcon, SettingsIcon, DocsIcon, LogoutIcon, WashIcon, UserIcon, ShirtIcon, TagIcon } from './icons';
 import { ROLE_LABEL } from '../constants';
 
 const navItems = [
@@ -10,8 +10,9 @@ const navItems = [
   { name: 'Ordens de Serviço', path: '/orders',     icon: OrdersIcon,      roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Produção',        path: '/production',   icon: ProductionIcon,  roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Folha de Ponto',  path: '/timeclock',    icon: ClockIcon,       roles: ['ADMIN', 'MANAGER', 'STAFF'] },
-  { name: 'Peças',           path: '/inventory',    icon: PackageIcon,     roles: ['ADMIN', 'MANAGER', 'STAFF'] },
-  { name: 'Marcas',          path: '/brands',       icon: BrandIcon,       roles: ['ADMIN', 'MANAGER', 'STAFF'] },
+  { name: 'Peças',           path: '/clothing-items', icon: ShirtIcon,    roles: ['ADMIN', 'MANAGER', 'STAFF'] },
+  { name: 'Marcas',          path: '/brands',       icon: TagIcon,         roles: ['ADMIN', 'MANAGER'] },
+  { name: 'Estoque',         path: '/inventory',    icon: PackageIcon,     roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Financeiro',      path: '/finance',      icon: FinanceIcon,     roles: ['ADMIN', 'MANAGER'] },
   { name: 'Funcionários',    path: '/employees',    icon: EmployeesIcon,   roles: ['ADMIN', 'MANAGER'] },
   { name: 'Configurações',   path: '/settings',     icon: SettingsIcon,    roles: ['ADMIN'] },
@@ -24,16 +25,10 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, canManage } = useAuth();
   const location = useLocation();
 
-  // Se não houver usuário, não mostra nada
-  if (!user) return null;
-
-  const visibleItems = navItems.filter(item => {
-    if (!item.roles) return true;
-    return item.roles.includes(user.role);
-  });
+  const visibleItems = navItems.filter(item => !item.roles || item.roles.includes(user?.role as any));
 
   return (
     <>
@@ -46,19 +41,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
 
         {/* Logo */}
         <div className="flex items-center gap-3 px-5 py-5 border-b border-slate-700">
-          <div className="bg-blue-600 p-2 rounded-xl">
+          <div className="bg-brand-600 p-2 rounded-xl">
             <WashIcon className="h-6 w-6 text-white" />
           </div>
           <div>
             <p className="font-bold text-white text-sm leading-tight">Lavanderia</p>
-            <p className="text-blue-400 text-xs font-semibold">Eficiente</p>
+            <p className="text-brand-400 text-xs font-semibold">Eficiente</p>
           </div>
         </div>
 
         {/* User info */}
         <div className="px-4 py-3 border-b border-slate-700">
           <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-800">
-            <div className="bg-blue-500 rounded-lg p-1.5">
+            <div className="bg-brand-500 rounded-lg p-1.5">
               <UserIcon className="h-4 w-4 text-white" />
             </div>
             <div className="overflow-hidden">
@@ -79,7 +74,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ open, onClose }) => {
                 onClick={onClose}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150
                   ${isActive
-                    ? 'bg-blue-600 text-white shadow-sm'
+                    ? 'bg-brand-600 text-white shadow-sm'
                     : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}
               >
                 <item.icon className="h-4 w-4 shrink-0" />

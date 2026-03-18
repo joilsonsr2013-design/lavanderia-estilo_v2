@@ -14,6 +14,7 @@ import EmployeesView from './views/EmployeesView';
 import TimeClockView from './views/TimeClockView';
 import SettingsView from './views/SettingsView';
 import DocumentationView from './views/DocumentationView';
+import ClothingItemsView from './views/ClothingItemsView';
 import BrandsView from './views/BrandsView';
 import { Spinner } from './components/ui';
 
@@ -66,33 +67,36 @@ const AppRoutes: React.FC = () => {
       <Route path="/employees" element={
         <ProtectedRoute title="Funcionários" roles={['ADMIN', 'MANAGER']} element={<EmployeesView />} />
       } />
+      <Route path="/brands" element={
+        <ProtectedRoute title="Marcas" roles={['ADMIN', 'MANAGER']} element={<BrandsView />} />
+      } />
 
       {/* Admin only */}
       <Route path="/settings" element={
         <ProtectedRoute title="Configurações" roles={['ADMIN']} element={<SettingsView />} />
       } />
 
-      {/* All roles (Admin, Manager, Staff) */}
+      {/* All roles */}
       <Route path="/customers" element={
-        <ProtectedRoute title="Clientes" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<CustomersView />} />
+        <ProtectedRoute title="Clientes" element={<CustomersView />} />
       } />
       <Route path="/orders" element={
-        <ProtectedRoute title="Ordens de Serviço" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<OrdersView />} />
+        <ProtectedRoute title="Ordens de Serviço" element={<OrdersView />} />
       } />
       <Route path="/production" element={
-        <ProtectedRoute title="Produção" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<ProductionView />} />
+        <ProtectedRoute title="Produção" element={<ProductionView />} />
+      } />
+      <Route path="/clothing-items" element={
+        <ProtectedRoute title="Peças" element={<ClothingItemsView />} />
       } />
       <Route path="/inventory" element={
-        <ProtectedRoute title="Peças" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<InventoryView />} />
-      } />
-      <Route path="/brands" element={
-        <ProtectedRoute title="Marcas" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<BrandsView />} />
+        <ProtectedRoute title="Estoque" element={<InventoryView />} />
       } />
       <Route path="/timeclock" element={
-        <ProtectedRoute title="Folha de Ponto" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<TimeClockView />} />
+        <ProtectedRoute title="Folha de Ponto" element={<TimeClockView />} />
       } />
       <Route path="/documentation" element={
-        <ProtectedRoute title="Documentação" roles={['ADMIN', 'MANAGER', 'STAFF']} element={<DocumentationView />} />
+        <ProtectedRoute title="Documentação" element={<DocumentationView />} />
       } />
 
       {/* Catch-all */}

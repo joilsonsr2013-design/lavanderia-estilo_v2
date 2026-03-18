@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Card, Button, Input, Textarea, Modal, Alert, EmptyState, LoadingState, Badge } from '../components/ui';
+import { Card, Button, Input, Select, Textarea, Modal, Alert, EmptyState, LoadingState, Badge, SearchableSelect } from '../components/ui';
 import { PlusIcon, EditIcon, TrashIcon, SearchIcon, UsersIcon, PhoneIcon, MailIcon, MapPinIcon, EyeIcon, ClipboardListIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
-import { customersApi } from '../services/api';
+import { customersApi, ordersApi } from '../services/api';
 import { formatDate, formatCurrency } from '../utils/helpers';
-import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR } from '../constants';
-import { OrderStatus, type Customer, type Order } from '../types';
+import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, FABRIC_TYPES, ITEM_COLORS, DIRT_LEVELS } from '../constants';
+import { OrderStatus, OrderPriority, ServiceType, SERVICE_TYPE_LABEL, type Customer, type Order, type ClothingItem } from '../types';
 
 const empty = { name: '', email: '', phone: '', address: '', notes: '' };
 
@@ -21,8 +21,20 @@ const ACTIVE_STATUSES = [
   OrderStatus.READY_FOR_DELIVERY,
 ];
 
+interface OrderFormItem {
+  clothingItemId: string;
+  serviceType: ServiceType;
+  brandId: string;
+  quantity: number;
+  unitPrice: number;
+  fabricType: string;
+  color: string;
+  dirtLevel: string;
+  damageNotes: string;
+}
+
 const CustomersView: React.FC = () => {
-  const { customers, loadingCustomers, refreshCustomers } = useAppContext();
+  const { customers, clothingItems, brands, loadingClothingItems, loadingBrands, loadingCustomers, refreshCustomers, refreshOrders } = useAppContext();
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
@@ -35,6 +47,31 @@ const CustomersView: React.FC = () => {
   const [detailModal, setDetailModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer & { orders?: Order[] } | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+
+  // Estado para criar ordem
+  const [orderModal, setOrderModal] = useState(false);
+  const [orderSaving, setOrderSaving] = useState(false);
+  const [orderError, setOrderError] = useState('');
+  const [orderPriority, setOrderPriority] = useState<OrderPriority>(OrderPriority.MEDIUM);
+  const [orderDueDate, setOrderDueDate] = useState('');
+  const [orderDescription, setOrderDescription] = useState('');
+  const [orderItems, setOrderItems] = useState<OrderFormItem[]>([
+    { clothingItemId: '', serviceType: ServiceType.WASH_IRON, brandId: '', quantity: 1, unitPrice: 0, fabricType: '', color: '', dirtLevel: 'Leve', damageNotes: '' }
+  ]);
+
+  // Active clothing items
+  const activeClothingItems = clothingItems.filter(item => item.active);
+  // Active brands
+  const activeBrands = brands.filter(brand => brand.active);
+
+  // Group clothing items by category
+  const clothingItemsByCategory = activeClothingItems.reduce((acc, item) => {
+    if (!acc[item.category]) acc[item.category] = [];
+    acc[item.category].push(item);
+    return acc;
+  }, {} as Record<string, ClothingItem[]>);
+
+  const orderTotal = orderItems.reduce((s, i) => s + (i.quantity * i.unitPrice), 0);
 
   const filtered = customers.filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -66,6 +103,82 @@ const CustomersView: React.FC = () => {
 
   const closeModal = () => { setModal(false); setEditing(null); };
   const closeDetailModal = () => { setDetailModal(false); setSelectedCustomer(null); };
+
+  // Order functions
+  const openOrderModal = () => {
+    if (!selectedCustomer) return;
+    setOrderPriority(OrderPriority.MEDIUM);
+    setOrderDueDate('');
+    setOrderDescription('');
+    setOrderItems([{ clothingItemId: '', serviceType: ServiceType.WASH_IRON, brandId: '', quantity: 1, unitPrice: 0, fabricType: '', color: '', dirtLevel: 'Leve', damageNotes: '' }]);
+    setOrderError('');
+    setOrderModal(true);
+  };
+
+  const closeOrderModal = () => { setOrderModal(false); };
+
+  const addOrderItem = () => setOrderItems(prev => [...prev, { clothingItemId: '', serviceType: ServiceType.WASH_IRON, brandId: '', quantity: 1, unitPrice: 0, fabricType: '', color: '', dirtLevel: 'Leve', damageNotes: '' }]);
+  const removeOrderItem = (idx: number) => setOrderItems(prev => prev.filter((_, i) => i !== idx));
+
+  const updateOrderItem = (idx: number, field: string, value: any) => {
+    setOrderItems(prev => {
+      const next = [...prev];
+      next[idx] = { ...next[idx], [field]: value };
+      if (field === 'clothingItemId' || field === 'serviceType') {
+        const item = clothingItems.find(c => c.id === next[idx].clothingItemId);
+        if (item) {
+          next[idx].unitPrice = next[idx].serviceType === ServiceType.WASH_IRON ? item.priceWashIron : item.priceIronOnly;
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCustomer) return;
+    setOrderSaving(true);
+    setOrderError('');
+    try {
+      const validItems = orderItems.filter(i => i.clothingItemId && i.quantity > 0);
+      if (validItems.length === 0) throw new Error('Adicione pelo menos uma peça');
+
+      await ordersApi.create({
+        customerId: selectedCustomer.id,
+        priority: orderPriority,
+        description: orderDescription,
+        dueDate: orderDueDate || undefined,
+        totalAmount: orderTotal,
+        items: validItems.map(i => ({
+          clothingItemId: i.clothingItemId,
+          serviceType: i.serviceType,
+          brandId: i.brandId || undefined,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          totalPrice: i.quantity * i.unitPrice,
+          fabricType: i.fabricType,
+          color: i.color,
+          dirtLevel: i.dirtLevel,
+          damageNotes: i.damageNotes
+        }))
+      });
+      await refreshOrders();
+      // Refresh customer details to show new order
+      const details = await customersApi.get(selectedCustomer.id);
+      setSelectedCustomer(details);
+      setOrderModal(false);
+    } catch (err: any) {
+      setOrderError(err.message);
+    } finally {
+      setOrderSaving(false);
+    }
+  };
+
+  const priorityOpts = Object.values(OrderPriority).map(v => ({ value: v, label: PRIORITY_LABEL[v] }));
+  const serviceTypeOpts = [
+    { value: ServiceType.WASH_IRON, label: 'Lavar e Passar' },
+    { value: ServiceType.IRON_ONLY, label: 'Passar' }
+  ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -295,9 +408,98 @@ const CustomersView: React.FC = () => {
               }}>
                 <EditIcon className="h-4 w-4 mr-1" /> Editar Cliente
               </Button>
+              <Button variant="primary" onClick={openOrderModal}>
+                <ClipboardListIcon className="h-4 w-4 mr-1" /> Nova Ordem
+              </Button>
             </div>
           </div>
         ) : null}
+      </Modal>
+
+      {/* Order Creation Modal */}
+      <Modal isOpen={orderModal} onClose={closeOrderModal} title={`Nova Ordem - ${selectedCustomer?.name || ''}`} size="xl"
+        footer={<>
+          <Button variant="outline" onClick={closeOrderModal}>Cancelar</Button>
+          <Button type="submit" form="orderForm" isLoading={orderSaving}>Criar Ordem — {formatCurrency(orderTotal)}</Button>
+        </>}>
+        {orderError && <Alert type="error" message={orderError} className="mb-4" />}
+        {loadingClothingItems ? <LoadingState /> : (
+          <form id="orderForm" onSubmit={handleCreateOrder} className="space-y-5">
+            <div className="grid grid-cols-2 gap-4">
+              <Select label="Prioridade" value={orderPriority} onChange={e => setOrderPriority(e.target.value as OrderPriority)}
+                options={priorityOpts} containerClassName="col-span-2 sm:col-span-1" />
+              <Input label="Prazo de Entrega" type="date" value={orderDueDate} onChange={e => setOrderDueDate(e.target.value)} containerClassName="col-span-2 sm:col-span-1" />
+              <Input label="Observações" value={orderDescription} onChange={e => setOrderDescription(e.target.value)} placeholder="Observações gerais..." containerClassName="col-span-2" />
+            </div>
+
+            <div>
+              <div className="flex justify-between items-center mb-3">
+                <label className="text-sm font-bold text-slate-700">Peças de Roupa</label>
+                <Button type="button" variant="outline" size="sm" icon={PlusIcon} onClick={addOrderItem}>Adicionar Peça</Button>
+              </div>
+              <div className="space-y-3">
+                {orderItems.map((item, idx) => (
+                  <div key={idx} className="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                    <div className="grid grid-cols-3 gap-3">
+                      <SearchableSelect
+                        label="Peça"
+                        value={item.clothingItemId}
+                        onChange={(val) => updateOrderItem(idx, 'clothingItemId', val)}
+                        groups={Object.entries(clothingItemsByCategory).map(([category, items]) => ({
+                          label: category,
+                          options: items.map(i => ({
+                            value: i.id,
+                            label: i.name + (i.subcategory ? ` (${i.subcategory})` : '')
+                          }))
+                        }))}
+                        placeholder="Selecione uma peça..."
+                        searchPlaceholder="Buscar peça..."
+                        required
+                      />
+                      <div>
+                        <label className="block text-sm font-semibold text-slate-700 mb-1">Serviço</label>
+                        <select value={item.serviceType} onChange={e => updateOrderItem(idx, 'serviceType', e.target.value as ServiceType)}
+                          className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400">
+                          {serviceTypeOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                        </select>
+                      </div>
+                      <SearchableSelect
+                        label="Marca"
+                        value={item.brandId}
+                        onChange={(val) => updateOrderItem(idx, 'brandId', val)}
+                        options={activeBrands.map(b => ({ value: b.id, label: b.name }))}
+                        placeholder="Selecione..."
+                        searchPlaceholder="Buscar marca..."
+                      />
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <Input label="Qtd" type="number" min={1} value={item.quantity} onChange={e => updateOrderItem(idx, 'quantity', Number(e.target.value))} />
+                      <Input label="Preço Unit." type="number" step="0.01" min={0} value={item.unitPrice} onChange={e => updateOrderItem(idx, 'unitPrice', Number(e.target.value))} />
+                      <div className="flex items-end">
+                        <span className="text-xs text-slate-500 font-semibold pb-2">Subtotal: {formatCurrency(item.quantity * item.unitPrice)}</span>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <Select label="Tipo de Tecido" value={item.fabricType} onChange={e => updateOrderItem(idx, 'fabricType', e.target.value)}
+                        options={FABRIC_TYPES.map(f => ({ value: f, label: f }))} placeholder="Tipo..." />
+                      <Select label="Cor" value={item.color} onChange={e => updateOrderItem(idx, 'color', e.target.value)}
+                        options={ITEM_COLORS.map(c => ({ value: c, label: c }))} placeholder="Cor..." />
+                      <Select label="Sujidade" value={item.dirtLevel} onChange={e => updateOrderItem(idx, 'dirtLevel', e.target.value)}
+                        options={DIRT_LEVELS.map(d => ({ value: d, label: d }))} placeholder="Nível..." />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Input label="Observações" value={item.damageNotes} onChange={e => updateOrderItem(idx, 'damageNotes', e.target.value)} placeholder="Danos, manchas..." containerClassName="flex-1 mr-3" />
+                      {orderItems.length > 1 && <Button type="button" variant="ghost" size="sm" onClick={() => removeOrderItem(idx)} className="text-red-400"><TrashIcon className="h-3 w-3" /></Button>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-end mt-3 p-3 bg-brand-50 rounded-xl">
+                <p className="font-bold text-brand-700">Total: {formatCurrency(orderTotal)}</p>
+              </div>
+            </div>
+          </form>
+        )}
       </Modal>
     </div>
   );
