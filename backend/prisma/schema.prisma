@@ -101,11 +101,14 @@ model OrderItem {
   quantity    Int
   unitPrice   Float
   totalPrice  Float
-  serviceType String? // Lavar e Passar, Apenas Passar
-  brand       String? // Marca da peça
-  color       String?
-  dirtLevel   String?
-  damageNotes String?
+  
+  // Atributos de Lavanderia Profissional
+  serviceType String? // Lavar e Passar, Apenas Passar, Limpeza a Seco, etc.
+  brand       String? // Marca da peça (ex: Zara, Dudalina)
+  color       String? // Cor predominante
+  fabric      String? // Tipo de tecido (ex: Algodão, Seda, Linho)
+  dirtLevel   String? // Nível de sujidade (Leve, Médio, Pesado)
+  damageNotes String? // Avarias/Manchas pré-existentes (Check-in)
   notes       String? // Observações específicas da peça
 
   @@index([orderId])
@@ -115,16 +118,23 @@ model OrderItem {
 
 model Product {
   id                String      @id @default(uuid())
-  name              String
+  name              String      // Nome da peça (ex: Camisa Social)
   description       String?
   sku               String      @unique
-  price             Float       // Preço padrão (Lavar e Passar)
-  washAndIronPrice  Float?      // Preço específico Lavar e Passar
-  ironOnlyPrice     Float?      // Preço específico Apenas Passar
+  
+  // Precificação por Tipo de Serviço
+  price             Float       // Preço base/padrão
+  washAndIronPrice  Float?      // Preço Lavar e Passar
+  ironOnlyPrice     Float?      // Preço Apenas Passar
+  dryCleanPrice     Float?      // Preço Limpeza a Seco
+  
+  // Gestão de Insumos (opcional para peças, obrigatório para produtos de venda/uso)
   stock             Int         @default(0)
   minStock          Int         @default(0)
-  category          String?     // Vestuário, Cama e Banho, etc.
-  unit              String?     @default("un")
+  
+  category          String?     // Vestuário Masculino, Cama, Banho, etc.
+  unit              String?     @default("pç") // pç, un, kg, m2
+  
   createdAt         DateTime    @default(now())
   updatedAt         DateTime    @updatedAt
   orderItems        OrderItem[]

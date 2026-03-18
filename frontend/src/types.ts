@@ -30,6 +30,7 @@ export interface Product {
   price: number;
   washAndIronPrice?: number;
   ironOnlyPrice?: number;
+  dryCleanPrice?: number;
   stock: number;
   minStock: number;
   category?: string;
@@ -92,6 +93,7 @@ export interface OrderItem {
   serviceType?: string;
   brand?: string;
   color?: string;
+  fabric?: string;
   dirtLevel?: string;
   damageNotes?: string;
   notes?: string;

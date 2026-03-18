@@ -8,7 +8,6 @@ import { formatDate, formatCurrency, isOverdue, daysUntil } from '../utils/helpe
 import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL, WORKFLOW_STAGES, FINAL_STATUSES, ITEM_COLORS, DIRT_LEVELS } from '../constants';
 import { OrderStatus, OrderPriority, type Order } from '../types';
 
-// Status que representam ordens ativas (em andamento)
 const ACTIVE_ORDER_STATUSES = [
   OrderStatus.PENDING,
   OrderStatus.CLASSIFICATION,
@@ -19,6 +18,10 @@ const ACTIVE_ORDER_STATUSES = [
   OrderStatus.PACKAGING,
   OrderStatus.READY_FOR_DELIVERY,
 ];
+
+const BRANDS = ['Dudalina', 'Brooksfield', 'Zara', 'Hering', 'Renner', 'Trousseau', 'Buddemeyer', 'Ricardo Almeida', 'Vila Romana', 'Animale', 'Gucci', 'Prada', 'Outra'];
+const FABRICS = ['Algodão', 'Seda', 'Linho', 'Sintético', 'Lã', 'Couro', 'Veludo', 'Pluma de Ganso', 'Outro'];
+const SERVICES = ['Lavar e Passar', 'Apenas Passar', 'Limpeza a Seco', 'Tratamento de Manchas'];
 
 const OrdersView: React.FC = () => {
   const { orders, customers, inventory, refreshOrders } = useAppContext();
@@ -44,15 +47,15 @@ const OrdersView: React.FC = () => {
     serviceType: string;
     brand: string;
     color: string; 
+    fabric: string;
     dirtLevel: string; 
     damageNotes: string;
     notes: string;
   }[]>([
-    { productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brand: '', color: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }
+    { productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brand: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }
   ]);
 
-  // Services (non-insumos products)
-  const services = inventory.filter(p => p.category !== 'Insumos' && p.category !== 'Embalagem');
+  const servicesList = inventory.filter(p => p.category !== 'Insumos' && p.category !== 'Embalagem');
 
   const filtered = orders.filter(o => {
     const matchSearch = !search || o.orderNumber?.toLowerCase().includes(search.toLowerCase()) || o.customer?.name?.toLowerCase().includes(search.toLowerCase());
@@ -64,25 +67,22 @@ const OrdersView: React.FC = () => {
 
   const total = items.reduce((s, i) => s + (i.quantity * i.unitPrice), 0);
 
-  const addItem = () => setItems(prev => [...prev, { productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brand: '', color: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }]);
+  const addItem = () => setItems(prev => [...prev, { productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brand: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }]);
   const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
   const updateItem = (idx: number, field: string, value: any) => {
     setItems(prev => {
       const next = [...prev];
       next[idx] = { ...next[idx], [field]: value };
       
-      // Se mudar o produto ou o tipo de serviço, atualiza o preço unitário
       if (field === 'productId' || field === 'serviceType') {
         const prodId = field === 'productId' ? value : next[idx].productId;
         const srvType = field === 'serviceType' ? value : next[idx].serviceType;
         const prod = inventory.find(p => p.id === prodId);
         
         if (prod) {
-          if (srvType === 'Apenas Passar' && prod.ironOnlyPrice) {
-            next[idx].unitPrice = prod.ironOnlyPrice;
-          } else {
-            next[idx].unitPrice = prod.washAndIronPrice || prod.price;
-          }
+          if (srvType === 'Apenas Passar' && prod.ironOnlyPrice) next[idx].unitPrice = prod.ironOnlyPrice;
+          else if (srvType === 'Limpeza a Seco' && prod.dryCleanPrice) next[idx].unitPrice = prod.dryCleanPrice;
+          else next[idx].unitPrice = prod.washAndIronPrice || prod.price;
         }
       }
       return next;
@@ -91,7 +91,7 @@ const OrdersView: React.FC = () => {
 
   const openNew = () => {
     setCustomerId(''); setPriority(OrderPriority.MEDIUM); setDescription(''); setDueDate('');
-    setItems([{ productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brand: '', color: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }]);
+    setItems([{ productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brand: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }]);
     setError(''); setModal(true);
   };
 
@@ -113,6 +113,7 @@ const OrdersView: React.FC = () => {
           serviceType: i.serviceType,
           brand: i.brand,
           color: i.color, 
+          fabric: i.fabric,
           dirtLevel: i.dirtLevel, 
           damageNotes: i.damageNotes,
           notes: i.notes
@@ -132,28 +133,6 @@ const OrdersView: React.FC = () => {
     finally { setAdvancingId(null); }
   };
 
-  const handleCancel = async (order: Order) => {
-    if (!confirm('Cancelar este pedido?')) return;
-    try { await ordersApi.updateStatus(order.id, OrderStatus.CANCELLED); await refreshOrders(); }
-    catch (err: any) { alert(err.message); }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!canManage) return;
-    if (!confirm('Excluir este pedido permanentemente?')) return;
-    try { await ordersApi.delete(id); await refreshOrders(); }
-    catch (err: any) { alert(err.message); }
-  };
-
-  const priorityOpts = Object.values(OrderPriority).map(v => ({ value: v, label: PRIORITY_LABEL[v] }));
-  const statusOpts = [
-    { value: 'active', label: 'Em Andamento' },
-    { value: '', label: 'Todos os status' },
-    ...WORKFLOW_STAGES.map(s => ({ value: s.id, label: s.label }))
-  ];
-
-  const activeOrdersCount = orders.filter(o => ACTIVE_ORDER_STATUSES.includes(o.status)).length;
-
   return (
     <div className="space-y-4 animate-fade-in">
       <Card>
@@ -166,82 +145,62 @@ const OrdersView: React.FC = () => {
             </div>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400">
-              {statusOpts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+              <option value="active">Em Andamento</option>
+              <option value="">Todos os status</option>
+              {WORKFLOW_STAGES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
-            {statusFilter === 'active' && (
-              <span className="text-xs text-slate-500 bg-brand-50 px-2 py-1 rounded-lg">
-                {activeOrdersCount} {activeOrdersCount === 1 ? 'ordem ativa' : 'ordens ativas'}
-              </span>
-            )}
           </div>
-          <Button icon={PlusIcon} onClick={openNew}>Nova Ordem</Button>
+          <Button icon={PlusIcon} onClick={openNew}>Novo Rol de Roupas</Button>
         </div>
       </Card>
 
       {filtered.length === 0 ? (
-        <Card><EmptyState icon={OrdersIcon} message="Nenhuma ordem encontrada." action={<Button icon={PlusIcon} onClick={openNew}>Criar Ordem</Button>} /></Card>
+        <Card><EmptyState icon={OrdersIcon} message="Nenhum rol de roupas encontrado." action={<Button icon={PlusIcon} onClick={openNew}>Criar Rol</Button>} /></Card>
       ) : (
         <Card padding={false}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-100">
-                  {['Nº Pedido', 'Cliente', 'Status', 'Prioridade', 'Prazo', 'Valor', 'Ações'].map(h => (
+                  {['Rol Nº', 'Cliente', 'Status', 'Prazo', 'Total', 'Ações'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider first:pl-5 last:pr-5">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {filtered.map(order => {
-                  const overdue = isOverdue(order.dueDate) && !FINAL_STATUSES.includes(order.status);
-                  const days = daysUntil(order.dueDate);
-                  const nextStatus = NEXT_STATUS[order.status];
-                  return (
-                    <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-5 py-3">
-                        <button onClick={() => { setSelectedOrder(order); setDetailModal(true); }}
-                          className="font-mono text-xs font-bold text-brand-600 hover:underline">
-                          #{order.orderNumber?.slice(-8).toUpperCase()}
-                        </button>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-slate-700">{order.customer?.name || '-'}</td>
-                      <td className="px-4 py-3">
-                        <Badge color={`${STATUS_BG[order.status]} ${STATUS_COLOR[order.status]}`}>
-                          {STATUS_LABEL[order.status] || order.status}
-                        </Badge>
-                      </td>
-                      <td className="px-4 py-3">
-                        {order.priority && <Badge color={PRIORITY_COLOR[order.priority]}>{PRIORITY_LABEL[order.priority]}</Badge>}
-                      </td>
-                      <td className="px-4 py-3">
-                        {order.dueDate ? (
-                          <span className={`text-xs font-semibold flex items-center gap-1 ${overdue ? 'text-red-600' : days !== null && days <= 1 ? 'text-amber-600' : 'text-slate-600'}`}>
-                            {overdue && <AlertIcon className="h-3 w-3" />}
-                            {formatDate(order.dueDate)}
-                          </span>
-                        ) : <span className="text-xs text-slate-400">-</span>}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-slate-700">{formatCurrency(order.totalAmount)}</td>
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-1">
-                          {nextStatus && (
-                            <Button size="sm" variant="primary" isLoading={advancingId === order.id}
-                              onClick={() => handleAdvanceStatus(order)} title={NEXT_STATUS_LABEL[order.status]}>
-                              <ChevronRightIcon className="h-3 w-3" />
-                              <span className="hidden sm:inline text-xs">{NEXT_STATUS_LABEL[order.status]?.split(' ')[0]}</span>
-                            </Button>
-                          )}
-                          {!FINAL_STATUSES.includes(order.status) && (
-                            <Button size="sm" variant="ghost" onClick={() => handleCancel(order)} className="text-red-400 hover:text-red-600" title="Cancelar">✕</Button>
-                          )}
-                          {canManage && (
-                            <Button size="sm" variant="ghost" onClick={() => handleDelete(order.id)} className="text-slate-400" title="Excluir"><TrashIcon className="h-3 w-3" /></Button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {filtered.map(order => (
+                  <tr key={order.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3">
+                      <button onClick={() => { setSelectedOrder(order); setDetailModal(true); }}
+                        className="font-mono text-xs font-bold text-brand-600 hover:underline">
+                        #{order.orderNumber?.slice(-8).toUpperCase()}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-700">{order.customer?.name}</td>
+                    <td className="px-4 py-3">
+                      <Badge color={`${STATUS_BG[order.status]} ${STATUS_COLOR[order.status]}`}>
+                        {STATUS_LABEL[order.status]}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-semibold ${isOverdue(order.dueDate) ? 'text-red-600' : 'text-slate-600'}`}>
+                        {formatDate(order.dueDate)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-sm font-semibold text-slate-700">{formatCurrency(order.totalAmount)}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-1">
+                        {NEXT_STATUS[order.status] && (
+                          <Button size="sm" variant="primary" isLoading={advancingId === order.id}
+                            onClick={() => handleAdvanceStatus(order)} title={NEXT_STATUS_LABEL[order.status]}>
+                            <ChevronRightIcon className="h-3 w-3" />
+                            <span className="hidden sm:inline text-xs">{NEXT_STATUS_LABEL[order.status]?.split(' ')[0]}</span>
+                          </Button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
@@ -249,12 +208,12 @@ const OrdersView: React.FC = () => {
       )}
 
       {/* NEW ORDER MODAL */}
-      <Modal isOpen={modal} onClose={() => setModal(false)} title="Nova Ordem de Serviço" size="xl"
+      <Modal isOpen={modal} onClose={() => setModal(false)} title="Check-in: Novo Rol de Roupas" size="xl"
         footer={<div className="flex justify-between items-center w-full">
           <div className="text-lg font-bold text-slate-800">Total: {formatCurrency(total)}</div>
           <div className="flex gap-3">
             <Button variant="outline" onClick={() => setModal(false)}>Cancelar</Button>
-            <Button onClick={handleSubmit} isLoading={saving}>Criar Pedido</Button>
+            <Button onClick={handleSubmit} isLoading={saving}>Gerar Rol</Button>
           </div>
         </div>}>
         {error && <Alert type="error" message={error} className="mb-4" />}
@@ -262,97 +221,79 @@ const OrdersView: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Select label="Cliente" required value={customerId} onChange={e => setCustomerId(e.target.value)}
               options={customers.map(c => ({ value: c.id, label: c.name }))} placeholder="Selecione o cliente" />
-            <Select label="Prioridade" value={priority} onChange={e => setPriority(e.target.value as OrderPriority)} options={priorityOpts} />
-            <Input label="Prazo de Entrega" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
+            <Select label="Prioridade" value={priority} onChange={e => setPriority(e.target.value as OrderPriority)} 
+              options={Object.values(OrderPriority).map(v => ({ value: v, label: PRIORITY_LABEL[v] }))} />
+            <Input label="Previsão de Entrega" type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} />
           </div>
 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"><TagIcon className="h-4 w-4" /> Peças e Serviços</h4>
+              <h4 className="text-sm font-bold text-slate-700 flex items-center gap-2"><TagIcon className="h-4 w-4" /> Detalhamento das Peças</h4>
               <Button type="button" size="sm" variant="outline" onClick={addItem} icon={PlusIcon}>Adicionar Peça</Button>
             </div>
             
             <div className="space-y-4">
               {items.map((item, idx) => (
-                <div key={idx} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3 relative group">
+                <div key={idx} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3 relative">
                   {items.length > 1 && (
-                    <button type="button" onClick={() => removeItem(idx)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500 transition-colors">
+                    <button type="button" onClick={() => removeItem(idx)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500">
                       <TrashIcon className="h-4 w-4" />
                     </button>
                   )}
                   
                   <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                    <div className="md:col-span-4">
+                    <div className="md:col-span-5">
                       <Select label="Peça" required value={item.productId} onChange={e => updateItem(idx, 'productId', e.target.value)}
-                        options={services.map(s => ({ value: s.id, label: `${s.name} (${s.category})` }))} placeholder="Selecione a peça" />
+                        options={servicesList.map(s => ({ value: s.id, label: `${s.name} (${s.category})` }))} placeholder="Escolha a peça" />
                     </div>
                     <div className="md:col-span-3">
                       <Select label="Serviço" value={item.serviceType} onChange={e => updateItem(idx, 'serviceType', e.target.value)}
-                        options={[{ value: 'Lavar e Passar', label: 'Lavar e Passar' }, { value: 'Apenas Passar', label: 'Apenas Passar' }]} />
+                        options={SERVICES.map(s => ({ value: s, label: s }))} />
                     </div>
                     <div className="md:col-span-2">
                       <Input label="Qtd" type="number" min="1" value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)} />
                     </div>
-                    <div className="md:col-span-3">
-                      <Input label="Preço Unit." type="number" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', parseFloat(e.target.value) || 0)} />
+                    <div className="md:col-span-2">
+                      <Input label="Unit. (R$)" type="number" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', parseFloat(e.target.value) || 0)} />
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <Input label="Cor" value={item.color} onChange={e => updateItem(idx, 'color', e.target.value)} placeholder="Ex: Azul, Branco" />
-                    <Input label="Marca" value={item.brand} onChange={e => updateItem(idx, 'brand', e.target.value)} placeholder="Ex: Zara, Hering" />
-                    <Select label="Sujidade" value={item.dirtLevel} onChange={e => updateItem(idx, 'dirtLevel', e.target.value)}
-                      options={DIRT_LEVELS.map(l => ({ value: l, label: l }))} />
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <Select label="Marca" value={item.brand} onChange={e => updateItem(idx, 'brand', e.target.value)} options={BRANDS.map(b => ({ value: b, label: b }))} />
+                    <Input label="Cor" value={item.color} onChange={e => updateItem(idx, 'color', e.target.value)} placeholder="Ex: Azul marinho" />
+                    <Select label="Tecido" value={item.fabric} onChange={e => updateItem(idx, 'fabric', e.target.value)} options={FABRICS.map(f => ({ value: f, label: f }))} />
+                    <Select label="Sujidade" value={item.dirtLevel} onChange={e => updateItem(idx, 'dirtLevel', e.target.value)} options={DIRT_LEVELS.map(l => ({ value: l, label: l }))} />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Input label="Avarias/Manchas" value={item.damageNotes} onChange={e => updateItem(idx, 'damageNotes', e.target.value)} placeholder="Ex: Mancha de café, botão faltando" />
-                    <Input label="Observações" value={item.notes} onChange={e => updateItem(idx, 'notes', e.target.value)} placeholder="Ex: Não usar amaciante" />
+                    <Input label="Avarias/Manchas (Check-in)" value={item.damageNotes} onChange={e => updateItem(idx, 'damageNotes', e.target.value)} placeholder="Descreva furos, manchas prévias ou botões faltando..." />
+                    <Input label="Observações de Lavagem" value={item.notes} onChange={e => updateItem(idx, 'notes', e.target.value)} placeholder="Instruções específicas para esta peça..." />
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <Textarea label="Observações Gerais do Pedido" value={description} onChange={e => setDescription(e.target.value)} placeholder="Instruções adicionais para a lavanderia..." />
+          <Textarea label="Notas do Atendimento" value={description} onChange={e => setDescription(e.target.value)} placeholder="Instruções gerais de entrega ou retirada..." />
         </form>
       </Modal>
 
       {/* ORDER DETAILS MODAL */}
-      <Modal isOpen={detailModal} onClose={() => setDetailModal(false)} title={`Detalhes do Pedido #${selectedOrder?.orderNumber?.slice(-8).toUpperCase()}`} size="lg">
+      <Modal isOpen={detailModal} onClose={() => setDetailModal(false)} title={`Rol de Roupas #${selectedOrder?.orderNumber?.slice(-8).toUpperCase()}`} size="lg">
         {selectedOrder && (
           <div className="space-y-6">
             <div className="flex justify-between items-start">
               <div>
                 <h3 className="text-lg font-bold text-slate-800">{selectedOrder.customer?.name}</h3>
-                <p className="text-sm text-slate-500">{selectedOrder.customer?.phone} | {selectedOrder.customer?.email}</p>
+                <p className="text-sm text-slate-500">{selectedOrder.customer?.phone}</p>
               </div>
               <Badge color={`${STATUS_BG[selectedOrder.status]} ${STATUS_COLOR[selectedOrder.status]}`}>
                 {STATUS_LABEL[selectedOrder.status]}
               </Badge>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-4 border-y border-slate-100">
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">Data</p>
-                <p className="text-sm font-semibold">{formatDate(selectedOrder.createdAt)}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">Prazo</p>
-                <p className="text-sm font-semibold">{formatDate(selectedOrder.dueDate)}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">Prioridade</p>
-                <p className="text-sm font-semibold">{PRIORITY_LABEL[selectedOrder.priority || 'MEDIUM']}</p>
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-400 uppercase">Total</p>
-                <p className="text-sm font-bold text-brand-600">{formatCurrency(selectedOrder.totalAmount)}</p>
-              </div>
-            </div>
-
             <div className="space-y-3">
-              <h4 className="text-sm font-bold text-slate-700">Itens do Pedido</h4>
+              <h4 className="text-sm font-bold text-slate-700">Peças Recebidas</h4>
               <div className="space-y-2">
                 {selectedOrder.items?.map((item, i) => (
                   <div key={i} className="p-3 rounded-xl border border-slate-100 bg-slate-50">
@@ -361,28 +302,22 @@ const OrdersView: React.FC = () => {
                       <span>{formatCurrency(item.totalPrice)}</span>
                     </div>
                     <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                      <span><strong>Serviço:</strong> {item.serviceType || 'Lavar e Passar'}</span>
-                      {item.color && <span><strong>Cor:</strong> {item.color}</span>}
+                      <span><strong>Serviço:</strong> {item.serviceType}</span>
                       {item.brand && <span><strong>Marca:</strong> {item.brand}</span>}
-                      {item.dirtLevel && <span><strong>Sujidade:</strong> {item.dirtLevel}</span>}
+                      {item.color && <span><strong>Cor:</strong> {item.color}</span>}
+                      {item.fabric && <span><strong>Tecido:</strong> {item.fabric}</span>}
                     </div>
-                    {(item.damageNotes || item.notes) && (
-                      <div className="text-xs mt-2 p-2 bg-white rounded border border-slate-100">
-                        {item.damageNotes && <p><strong>Avarias:</strong> {item.damageNotes}</p>}
-                        {item.notes && <p><strong>Obs:</strong> {item.notes}</p>}
-                      </div>
-                    )}
+                    {item.damageNotes && <p className="text-xs text-red-500 mt-1"><strong>Avarias:</strong> {item.damageNotes}</p>}
+                    {item.notes && <p className="text-xs text-slate-600 mt-1 italic">"{item.notes}"</p>}
                   </div>
                 ))}
               </div>
             </div>
 
-            {selectedOrder.description && (
-              <div className="space-y-1">
-                <h4 className="text-sm font-bold text-slate-700">Observações Gerais</h4>
-                <p className="text-sm text-slate-600 bg-slate-50 p-3 rounded-xl">{selectedOrder.description}</p>
-              </div>
-            )}
+            <div className="flex justify-between items-center p-4 bg-brand-50 rounded-xl">
+              <span className="text-sm font-bold text-brand-800">Valor Total do Rol:</span>
+              <span className="text-xl font-bold text-brand-600">{formatCurrency(selectedOrder.totalAmount)}</span>
+            </div>
           </div>
         )}
       </Modal>
