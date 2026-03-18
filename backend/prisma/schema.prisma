@@ -3,58 +3,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-}
-
-enum OrderStatus {
-  PENDING
-  CLASSIFICATION
-  WASHING
-  DRYING
-  IRONING
-  INSPECTION
-  PACKAGING
-  READY_FOR_DELIVERY
-  DELIVERED
-  CANCELLED
-}
-
-enum OrderPriority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-enum ProductionStatus {
-  PENDING
-  IN_PROGRESS
-  QUALITY_CHECK
-  COMPLETED
-  ON_HOLD
-}
-
-enum EmployeeRole {
-  ADMIN
-  MANAGER
-  STAFF
-}
-
-enum EmployeeStatus {
-  ACTIVE
-  INACTIVE
-  ON_LEAVE
-}
-
-enum TimeRecordType {
-  CLOCK_IN
-  CLOCK_OUT
-}
-
-enum TransactionType {
-  INCOME
-  EXPENSE
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model Customer {
@@ -64,7 +14,7 @@ model Customer {
   phone       String
   address     String?
   notes       String?
-  preferences Json?
+  preferences String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   orders      Order[]
@@ -77,8 +27,8 @@ model Order {
   orderNumber String        @unique @default(cuid())
   customerId  String
   customer    Customer      @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  status      OrderStatus   @default(PENDING)
-  priority    OrderPriority @default(MEDIUM)
+  status      String        @default("PENDING")
+  priority    String        @default("MEDIUM")
   totalAmount Float
   description String?
   dueDate     DateTime?
@@ -173,7 +123,7 @@ model Production {
   id         String           @id @default(uuid())
   orderId    String
   order      Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  status     ProductionStatus @default(PENDING)
+  status     String           @default("PENDING")
   assignedTo String?
   employee   Employee?        @relation(fields: [assignedTo], references: [id])
   startDate  DateTime?
@@ -194,8 +144,8 @@ model Employee {
   name        String
   email       String         @unique
   phone       String?
-  role        EmployeeRole   @default(STAFF)
-  status      EmployeeStatus @default(ACTIVE)
+  role        String         @default("STAFF")
+  status      String         @default("ACTIVE")
   department  String?
   hireDate    DateTime       @default(now())
   salary      Float?
@@ -212,7 +162,7 @@ model TimeRecord {
   id         String         @id @default(uuid())
   employeeId String
   employee   Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  type       TimeRecordType
+  type       String
   timestamp  DateTime       @default(now())
   notes      String?
 
@@ -223,7 +173,7 @@ model TimeRecord {
 
 model Transaction {
   id          String          @id @default(uuid())
-  type        TransactionType
+  type        String
   category    String
   amount      Float
   description String?

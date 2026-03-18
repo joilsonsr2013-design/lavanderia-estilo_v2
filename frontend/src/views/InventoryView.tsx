@@ -17,23 +17,14 @@ const emptyForm = {
   dryCleanPrice: '0',
   stock: '9999', 
   minStock: '0', 
-  category: 'Vestuário Masculino', 
+  categoryId: '', 
   unit: 'pç' 
 };
-
-const CATEGORIES = [
-  'Vestuário Masculino', 
-  'Vestuário Feminino', 
-  'Cama e Banho', 
-  'Mesa e Decoração', 
-  'Especialidades', 
-  'Insumos (Uso Interno)'
-];
 
 const UNITS = ['pç', 'un', 'kg', 'm2', 'L', 'pc'];
 
 const InventoryView: React.FC = () => {
-  const { inventory, loadingInventory, refreshInventory } = useAppContext();
+  const { inventory, categories, loadingInventory, loadingCategories, refreshInventory } = useAppContext();
   const { canManage } = useAuth();
   const [search, setSearch] = useState('');
   const [catFilter, setCatFilter] = useState('');
@@ -45,11 +36,20 @@ const InventoryView: React.FC = () => {
 
   const filtered = inventory.filter(p => {
     const matchS = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.sku.toLowerCase().includes(search.toLowerCase());
-    const matchC = !catFilter || p.category === catFilter;
+    const matchC = !catFilter || p.categoryId === catFilter;
     return matchS && matchC;
   });
 
-  const openNew = () => { setEditing(null); setForm(emptyForm); setError(''); setModal(true); };
+  const openNew = () => { 
+    setEditing(null); 
+    setForm({
+      ...emptyForm,
+      categoryId: categories.length > 0 ? categories[0].id : ''
+    }); 
+    setError(''); 
+    setModal(true); 
+  };
+
   const openEdit = (p: Product) => {
     setEditing(p);
     setForm({ 
@@ -62,7 +62,7 @@ const InventoryView: React.FC = () => {
       dryCleanPrice: String(p.dryCleanPrice || 0),
       stock: String(p.stock), 
       minStock: String(p.minStock), 
-      category: p.category || 'Vestuário Masculino', 
+      categoryId: p.categoryId || '', 
       unit: p.unit || 'pç' 
     });
     setError(''); setModal(true);
@@ -90,6 +90,8 @@ const InventoryView: React.FC = () => {
     finally { setSaving(false); }
   };
 
+  if (loadingInventory || loadingCategories) return <LoadingState />;
+
   return (
     <div className="space-y-4 animate-fade-in">
       <Card>
@@ -103,14 +105,14 @@ const InventoryView: React.FC = () => {
             <select value={catFilter} onChange={e => setCatFilter(e.target.value)}
               className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none">
               <option value="">Todas as categorias</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           {canManage && <Button icon={PlusIcon} onClick={openNew}>Cadastrar Peça</Button>}
         </div>
       </Card>
 
-      {loadingInventory ? <LoadingState /> : filtered.length === 0 ? (
+      {filtered.length === 0 ? (
         <Card><EmptyState icon={PackageIcon} message="Nenhuma peça cadastrada no catálogo." action={canManage ? <Button icon={PlusIcon} onClick={openNew}>Adicionar Peça</Button> : undefined} /></Card>
       ) : (
         <Card padding={false}>
@@ -131,7 +133,7 @@ const InventoryView: React.FC = () => {
                       {item.description && <p className="text-xs text-slate-400 truncate max-w-xs">{item.description}</p>}
                     </td>
                     <td className="px-4 py-3"><span className="font-mono text-xs text-slate-500">{item.sku}</span></td>
-                    <td className="px-4 py-3"><Badge color="bg-slate-100 text-slate-600">{item.category}</Badge></td>
+                    <td className="px-4 py-3"><Badge color="bg-slate-100 text-slate-600">{item.category?.name || 'Sem Categoria'}</Badge></td>
                     <td className="px-4 py-3 font-semibold text-slate-700">{formatCurrency(item.washAndIronPrice || item.price)}</td>
                     <td className="px-4 py-3 font-semibold text-slate-700">{item.ironOnlyPrice ? formatCurrency(item.ironOnlyPrice) : '-'}</td>
                     <td className="px-4 py-3 font-semibold text-slate-700">{item.dryCleanPrice ? formatCurrency(item.dryCleanPrice) : '-'}</td>
@@ -162,9 +164,10 @@ const InventoryView: React.FC = () => {
               <Input name="sku" label="Código (SKU)" value={form.sku} onChange={handleChange} required placeholder="VEST-CAM-001" />
               <div className="space-y-1">
                 <label className="block text-sm font-semibold text-slate-700">Categoria</label>
-                <select name="category" value={form.category} onChange={handleChange}
+                <select name="categoryId" value={form.categoryId} onChange={handleChange} required
                   className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400">
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  <option value="">Selecione uma categoria</option>
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
               

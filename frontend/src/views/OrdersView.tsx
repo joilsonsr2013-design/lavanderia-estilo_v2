@@ -19,12 +19,11 @@ const ACTIVE_ORDER_STATUSES = [
   OrderStatus.READY_FOR_DELIVERY,
 ];
 
-const BRANDS = ['Dudalina', 'Brooksfield', 'Zara', 'Hering', 'Renner', 'Trousseau', 'Buddemeyer', 'Ricardo Almeida', 'Vila Romana', 'Animale', 'Gucci', 'Prada', 'Outra'];
 const FABRICS = ['Algodão', 'Seda', 'Linho', 'Sintético', 'Lã', 'Couro', 'Veludo', 'Pluma de Ganso', 'Outro'];
 const SERVICES = ['Lavar e Passar', 'Apenas Passar', 'Limpeza a Seco', 'Tratamento de Manchas'];
 
 const OrdersView: React.FC = () => {
-  const { orders, customers, inventory, refreshOrders } = useAppContext();
+  const { orders, customers, inventory, brands, refreshOrders } = useAppContext();
   const { canManage } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
@@ -45,17 +44,17 @@ const OrdersView: React.FC = () => {
     quantity: number; 
     unitPrice: number; 
     serviceType: string;
-    brand: string;
+    brandId: string;
     color: string; 
     fabric: string;
     dirtLevel: string; 
     damageNotes: string;
     notes: string;
   }[]>([
-    { productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brand: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }
+    { productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brandId: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }
   ]);
 
-  const servicesList = inventory.filter(p => p.category !== 'Insumos' && p.category !== 'Embalagem');
+  const servicesList = inventory.filter(p => p.category?.name !== 'Insumos' && p.category?.name !== 'Embalagem');
 
   const filtered = orders.filter(o => {
     const matchSearch = !search || o.orderNumber?.toLowerCase().includes(search.toLowerCase()) || o.customer?.name?.toLowerCase().includes(search.toLowerCase());
@@ -67,7 +66,7 @@ const OrdersView: React.FC = () => {
 
   const total = items.reduce((s, i) => s + (i.quantity * i.unitPrice), 0);
 
-  const addItem = () => setItems(prev => [...prev, { productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brand: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }]);
+  const addItem = () => setItems(prev => [...prev, { productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brandId: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }]);
   const removeItem = (idx: number) => setItems(prev => prev.filter((_, i) => i !== idx));
   const updateItem = (idx: number, field: string, value: any) => {
     setItems(prev => {
@@ -91,7 +90,7 @@ const OrdersView: React.FC = () => {
 
   const openNew = () => {
     setCustomerId(''); setPriority(OrderPriority.MEDIUM); setDescription(''); setDueDate('');
-    setItems([{ productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brand: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }]);
+    setItems([{ productId: '', quantity: 1, unitPrice: 0, serviceType: 'Lavar e Passar', brandId: '', color: '', fabric: '', dirtLevel: 'Leve', damageNotes: '', notes: '' }]);
     setError(''); setModal(true);
   };
 
@@ -111,7 +110,7 @@ const OrdersView: React.FC = () => {
           unitPrice: i.unitPrice, 
           totalPrice: i.quantity * i.unitPrice, 
           serviceType: i.serviceType,
-          brand: i.brand,
+          brandId: i.brandId || undefined,
           color: i.color, 
           fabric: i.fabric,
           dirtLevel: i.dirtLevel, 
@@ -234,93 +233,109 @@ const OrdersView: React.FC = () => {
             
             <div className="space-y-4">
               {items.map((item, idx) => (
-                <div key={idx} className="p-4 rounded-xl border border-slate-100 bg-slate-50/50 space-y-3 relative">
-                  {items.length > 1 && (
-                    <button type="button" onClick={() => removeItem(idx)} className="absolute top-2 right-2 p-1 text-slate-400 hover:text-red-500">
-                      <TrashIcon className="h-4 w-4" />
-                    </button>
-                  )}
+                <div key={idx} className="p-4 bg-slate-50 rounded-2xl border border-slate-200 relative group animate-slide-in">
+                  <button type="button" onClick={() => removeItem(idx)} className="absolute -top-2 -right-2 bg-white text-red-500 p-1.5 rounded-full shadow-md hover:bg-red-50 transition-colors">
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                    <div className="md:col-span-5">
-                      <Select label="Peça" required value={item.productId} onChange={e => updateItem(idx, 'productId', e.target.value)}
-                        options={servicesList.map(s => ({ value: s.id, label: `${s.name} (${s.category})` }))} placeholder="Escolha a peça" />
-                    </div>
-                    <div className="md:col-span-3">
-                      <Select label="Serviço" value={item.serviceType} onChange={e => updateItem(idx, 'serviceType', e.target.value)}
-                        options={SERVICES.map(s => ({ value: s, label: s }))} />
-                    </div>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
                     <div className="md:col-span-2">
-                      <Input label="Qtd" type="number" min="1" value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value) || 0)} />
+                      <Select label="Peça / Serviço" required value={item.productId} onChange={e => updateItem(idx, 'productId', e.target.value)}
+                        options={servicesList.map(p => ({ value: p.id, label: p.name }))} placeholder="Selecione a peça" />
                     </div>
-                    <div className="md:col-span-2">
-                      <Input label="Unit. (R$)" type="number" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', parseFloat(e.target.value) || 0)} />
-                    </div>
+                    <Input label="Qtd" type="number" min="1" value={item.quantity} onChange={e => updateItem(idx, 'quantity', parseInt(e.target.value))} />
+                    <Input label="Preço Unit. (R$)" type="number" step="0.01" value={item.unitPrice} onChange={e => updateItem(idx, 'unitPrice', parseFloat(e.target.value))} />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                    <Select label="Marca" value={item.brand} onChange={e => updateItem(idx, 'brand', e.target.value)} options={BRANDS.map(b => ({ value: b, label: b }))} />
-                    <Input label="Cor" value={item.color} onChange={e => updateItem(idx, 'color', e.target.value)} placeholder="Ex: Azul marinho" />
-                    <Select label="Tecido" value={item.fabric} onChange={e => updateItem(idx, 'fabric', e.target.value)} options={FABRICS.map(f => ({ value: f, label: f }))} />
-                    <Select label="Sujidade" value={item.dirtLevel} onChange={e => updateItem(idx, 'dirtLevel', e.target.value)} options={DIRT_LEVELS.map(l => ({ value: l, label: l }))} />
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <Select label="Serviço" value={item.serviceType} onChange={e => updateItem(idx, 'serviceType', e.target.value)}
+                      options={SERVICES.map(s => ({ value: s, label: s }))} />
+                    <Select label="Marca" value={item.brandId} onChange={e => updateItem(idx, 'brandId', e.target.value)}
+                      options={brands.map(b => ({ value: b.id, label: b.name }))} placeholder="Selecione a marca" />
+                    <Select label="Cor" value={item.color} onChange={e => updateItem(idx, 'color', e.target.value)}
+                      options={ITEM_COLORS.map(c => ({ value: c, label: c }))} />
+                    <Select label="Tecido" value={item.fabric} onChange={e => updateItem(idx, 'fabric', e.target.value)}
+                      options={FABRICS.map(f => ({ value: f, label: f }))} />
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Input label="Avarias/Manchas (Check-in)" value={item.damageNotes} onChange={e => updateItem(idx, 'damageNotes', e.target.value)} placeholder="Descreva furos, manchas prévias ou botões faltando..." />
-                    <Input label="Observações de Lavagem" value={item.notes} onChange={e => updateItem(idx, 'notes', e.target.value)} placeholder="Instruções específicas para esta peça..." />
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                    <Select label="Nível de Sujeira" value={item.dirtLevel} onChange={e => updateItem(idx, 'dirtLevel', e.target.value)}
+                      options={DIRT_LEVELS.map(d => ({ value: d, label: d }))} />
+                    <Input label="Avarias / Manchas (Check-in)" placeholder="Ex: Mancha de vinho na manga esquerda" value={item.damageNotes} onChange={e => updateItem(idx, 'damageNotes', e.target.value)} />
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <Textarea label="Notas do Atendimento" value={description} onChange={e => setDescription(e.target.value)} placeholder="Instruções gerais de entrega ou retirada..." />
+          <div className="space-y-1">
+            <label className="block text-sm font-bold text-slate-700">Observações Gerais do Rol</label>
+            <Textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Instruções especiais para este pedido..." />
+          </div>
         </form>
       </Modal>
 
       {/* ORDER DETAILS MODAL */}
-      <Modal isOpen={detailModal} onClose={() => setDetailModal(false)} title={`Rol de Roupas #${selectedOrder?.orderNumber?.slice(-8).toUpperCase()}`} size="lg">
-        {selectedOrder && (
+      {selectedOrder && (
+        <Modal isOpen={detailModal} onClose={() => setDetailModal(false)} title={`Rol #${selectedOrder.orderNumber?.slice(-8).toUpperCase()}`} size="xl">
           <div className="space-y-6">
-            <div className="flex justify-between items-start">
+            <div className="flex justify-between items-start border-b border-slate-100 pb-4">
               <div>
-                <h3 className="text-lg font-bold text-slate-800">{selectedOrder.customer?.name}</h3>
-                <p className="text-sm text-slate-500">{selectedOrder.customer?.phone}</p>
+                <h3 className="text-xl font-bold text-slate-900">{selectedOrder.customer?.name}</h3>
+                <p className="text-sm text-slate-500">{selectedOrder.customer?.phone} • {selectedOrder.customer?.email}</p>
+                <div className="flex gap-2 mt-2">
+                  <Badge color={`${STATUS_BG[selectedOrder.status]} ${STATUS_COLOR[selectedOrder.status]}`}>{STATUS_LABEL[selectedOrder.status]}</Badge>
+                  <Badge color={PRIORITY_COLOR[selectedOrder.priority || 'MEDIUM']}>{PRIORITY_LABEL[selectedOrder.priority || 'MEDIUM']}</Badge>
+                </div>
               </div>
-              <Badge color={`${STATUS_BG[selectedOrder.status]} ${STATUS_COLOR[selectedOrder.status]}`}>
-                {STATUS_LABEL[selectedOrder.status]}
-              </Badge>
+              <div className="text-right">
+                <p className="text-xs text-slate-400 uppercase font-bold tracking-wider">Total do Rol</p>
+                <p className="text-2xl font-black text-brand-600">{formatCurrency(selectedOrder.totalAmount)}</p>
+                <p className="text-xs text-slate-500 mt-1">Previsão: {formatDate(selectedOrder.dueDate)}</p>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <h4 className="text-sm font-bold text-slate-700">Peças Recebidas</h4>
-              <div className="space-y-2">
-                {selectedOrder.items?.map((item, i) => (
-                  <div key={i} className="p-3 rounded-xl border border-slate-100 bg-slate-50">
-                    <div className="flex justify-between font-bold text-sm">
-                      <span>{item.quantity}x {item.product?.name}</span>
-                      <span>{formatCurrency(item.totalPrice)}</span>
+            <div className="space-y-4">
+              <h4 className="font-bold text-slate-800 text-sm uppercase tracking-widest">Peças no Rol</h4>
+              <div className="grid grid-cols-1 gap-3">
+                {selectedOrder.items?.map((item, idx) => (
+                  <div key={idx} className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-white rounded-xl border border-slate-100 shadow-sm">
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="w-6 h-6 flex items-center justify-center bg-brand-100 text-brand-700 rounded-full text-xs font-bold">{item.quantity}x</span>
+                        <h5 className="font-bold text-slate-800">{item.product?.name}</h5>
+                        <Badge variant="outline" className="text-[10px]">{item.serviceType}</Badge>
+                      </div>
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-slate-500">
+                        {item.brand && <span><strong className="text-slate-700">Marca:</strong> {item.brand.name}</span>}
+                        {item.color && <span><strong className="text-slate-700">Cor:</strong> {item.color}</span>}
+                        {item.fabric && <span><strong className="text-slate-700">Tecido:</strong> {item.fabric}</span>}
+                        {item.dirtLevel && <span><strong className="text-slate-700">Sujeira:</strong> {item.dirtLevel}</span>}
+                      </div>
+                      {item.damageNotes && (
+                        <div className="mt-2 p-2 bg-red-50 rounded text-xs text-red-700 border border-red-100">
+                          <strong>Avarias:</strong> {item.damageNotes}
+                        </div>
+                      )}
                     </div>
-                    <div className="text-xs text-slate-500 mt-1 flex flex-wrap gap-x-4 gap-y-1">
-                      <span><strong>Serviço:</strong> {item.serviceType}</span>
-                      {item.brand && <span><strong>Marca:</strong> {item.brand}</span>}
-                      {item.color && <span><strong>Cor:</strong> {item.color}</span>}
-                      {item.fabric && <span><strong>Tecido:</strong> {item.fabric}</span>}
+                    <div className="mt-3 md:mt-0 md:text-right">
+                      <p className="text-sm font-bold text-slate-700">{formatCurrency(item.totalPrice)}</p>
+                      <p className="text-[10px] text-slate-400">{formatCurrency(item.unitPrice)} / un</p>
                     </div>
-                    {item.damageNotes && <p className="text-xs text-red-500 mt-1"><strong>Avarias:</strong> {item.damageNotes}</p>}
-                    {item.notes && <p className="text-xs text-slate-600 mt-1 italic">"{item.notes}"</p>}
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="flex justify-between items-center p-4 bg-brand-50 rounded-xl">
-              <span className="text-sm font-bold text-brand-800">Valor Total do Rol:</span>
-              <span className="text-xl font-bold text-brand-600">{formatCurrency(selectedOrder.totalAmount)}</span>
-            </div>
+            {selectedOrder.description && (
+              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                <h4 className="text-xs font-bold text-amber-800 uppercase mb-1">Observações do Rol</h4>
+                <p className="text-sm text-amber-900">{selectedOrder.description}</p>
+              </div>
+            )}
           </div>
-        )}
-      </Modal>
+        </Modal>
+      )}
     </div>
   );
 };
