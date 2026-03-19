@@ -103,6 +103,18 @@ export const brandsApi = {
   delete: (id: string) => request<void>(`/api/brands/${id}`, { method: 'DELETE' }),
 };
 
+// ============ COLORS ============
+export const colorsApi = {
+  list: (params?: Record<string, string>) => {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return request<any[]>(`/api/colors${qs}`);
+  },
+  get: (id: string) => request<any>(`/api/colors/${id}`),
+  create: (data: any) => request<any>('/api/colors', { method: 'POST', body: JSON.stringify(data) }),
+  update: (id: string, data: any) => request<any>(`/api/colors/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (id: string) => request<void>(`/api/colors/${id}`, { method: 'DELETE' }),
+};
+
 // ============ PRODUCTION ============
 export const productionApi = {
   list: (params?: Record<string, string>) => {

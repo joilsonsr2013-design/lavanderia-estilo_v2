@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { customersApi, ordersApi, productsApi, employeesApi, clothingItemsApi, brandsApi } from '../services/api';
+import { customersApi, ordersApi, productsApi, employeesApi, clothingItemsApi, brandsApi, colorsApi } from '../services/api';
 import { useAuth } from './AuthContext';
-import type { Customer, Order, Product, Employee, ClothingItem, Brand } from '../types';
+import type { Customer, Order, Product, Employee, ClothingItem, Brand, Color } from '../types';
 
 interface AppContextType {
   customers: Customer[];
@@ -10,18 +10,21 @@ interface AppContextType {
   employees: Employee[];
   clothingItems: ClothingItem[];
   brands: Brand[];
+  colors: Color[];
   loadingCustomers: boolean;
   loadingOrders: boolean;
   loadingInventory: boolean;
   loadingEmployees: boolean;
   loadingClothingItems: boolean;
   loadingBrands: boolean;
+  loadingColors: boolean;
   refreshCustomers: () => Promise<void>;
   refreshOrders: () => Promise<void>;
   refreshInventory: () => Promise<void>;
   refreshEmployees: () => Promise<void>;
   refreshClothingItems: () => Promise<void>;
   refreshBrands: () => Promise<void>;
+  refreshColors: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
 
@@ -35,12 +38,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [clothingItems, setClothingItems] = useState<ClothingItem[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [colors, setColors] = useState<Color[]>([]);
   const [loadingCustomers, setLoadingCustomers] = useState(false);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [loadingInventory, setLoadingInventory] = useState(false);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingClothingItems, setLoadingClothingItems] = useState(false);
   const [loadingBrands, setLoadingBrands] = useState(false);
+  const [loadingColors, setLoadingColors] = useState(false);
 
   const refreshCustomers = useCallback(async () => {
     setLoadingCustomers(true);
@@ -73,9 +78,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try { setBrands(await brandsApi.list({ active: 'true' })); } catch {} finally { setLoadingBrands(false); }
   }, []);
 
+  const refreshColors = useCallback(async () => {
+    setLoadingColors(true);
+    try { setColors(await colorsApi.list({ active: 'true' })); } catch {} finally { setLoadingColors(false); }
+  }, []);
+
   const refreshAll = useCallback(async () => {
-    await Promise.all([refreshCustomers(), refreshOrders(), refreshInventory(), refreshEmployees(), refreshClothingItems(), refreshBrands()]);
-  }, [refreshCustomers, refreshOrders, refreshInventory, refreshEmployees, refreshClothingItems, refreshBrands]);
+    await Promise.all([refreshCustomers(), refreshOrders(), refreshInventory(), refreshEmployees(), refreshClothingItems(), refreshBrands(), refreshColors()]);
+  }, [refreshCustomers, refreshOrders, refreshInventory, refreshEmployees, refreshClothingItems, refreshBrands, refreshColors]);
 
   useEffect(() => {
     if (user) { refreshAll(); }
@@ -83,9 +93,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   return (
     <AppContext.Provider value={{
-      customers, orders, inventory, employees, clothingItems, brands,
-      loadingCustomers, loadingOrders, loadingInventory, loadingEmployees, loadingClothingItems, loadingBrands,
-      refreshCustomers, refreshOrders, refreshInventory, refreshEmployees, refreshClothingItems, refreshBrands, refreshAll
+      customers, orders, inventory, employees, clothingItems, brands, colors,
+      loadingCustomers, loadingOrders, loadingInventory, loadingEmployees, loadingClothingItems, loadingBrands, loadingColors,
+      refreshCustomers, refreshOrders, refreshInventory, refreshEmployees, refreshClothingItems, refreshBrands, refreshColors, refreshAll
     }}>
       {children}
     </AppContext.Provider>

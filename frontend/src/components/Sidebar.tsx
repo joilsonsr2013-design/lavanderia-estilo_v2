@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { DashboardIcon, UsersIcon, OrdersIcon, ProductionIcon, PackageIcon, FinanceIcon, ClockIcon, EmployeesIcon, SettingsIcon, DocsIcon, LogoutIcon, WashIcon, UserIcon, ShirtIcon, TagIcon } from './icons';
+import { DashboardIcon, UsersIcon, OrdersIcon, ProductionIcon, PackageIcon, FinanceIcon, ClockIcon, EmployeesIcon, SettingsIcon, DocsIcon, LogoutIcon, WashIcon, UserIcon, ShirtIcon, TagIcon, PaletteIcon } from './icons';
 import { ROLE_LABEL } from '../constants';
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { name: 'Folha de Ponto',  path: '/timeclock',    icon: ClockIcon,       roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Peças',           path: '/clothing-items', icon: ShirtIcon,    roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Marcas',          path: '/brands',       icon: TagIcon,         roles: ['ADMIN', 'MANAGER'] },
+  { name: 'Cores',           path: '/colors',       icon: PaletteIcon,     roles: ['ADMIN', 'MANAGER'] },
   { name: 'Estoque',         path: '/inventory',    icon: PackageIcon,     roles: ['ADMIN', 'MANAGER', 'STAFF'] },
   { name: 'Financeiro',      path: '/finance',      icon: FinanceIcon,     roles: ['ADMIN', 'MANAGER'] },
   { name: 'Funcionários',    path: '/employees',    icon: EmployeesIcon,   roles: ['ADMIN', 'MANAGER'] },

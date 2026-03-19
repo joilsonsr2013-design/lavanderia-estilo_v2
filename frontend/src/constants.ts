@@ -66,7 +66,6 @@ export const EXPENSE_CATEGORIES = ['Insumos', 'Salários', 'Utilidades', 'Manute
 export const PAYMENT_METHODS = ['Dinheiro', 'PIX', 'Cartão de Débito', 'Cartão de Crédito', 'Transferência', 'Boleto', 'Faturamento'];
 
 export const FABRIC_TYPES = ['Algodão', 'Sintético', 'Lã', 'Seda', 'Linho', 'Delicado'];
-export const ITEM_COLORS  = ['Branco', 'Claro', 'Escuro', 'Colorido'];
 export const DIRT_LEVELS  = ['Leve', 'Médio', 'Pesado'];
 
 // Status flow: which statuses can follow which

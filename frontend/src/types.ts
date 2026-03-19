@@ -117,6 +117,17 @@ export interface Brand {
   _count?: { orderItems: number };
 }
 
+// ============ COLOR ============
+export interface Color {
+  id: string;
+  name: string;
+  category?: string;
+  hexCode?: string;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface OrderItem {
   id?: string;
   productId?: string;

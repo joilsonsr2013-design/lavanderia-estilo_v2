@@ -75,6 +75,18 @@ model Brand {
   @@map("brands")
 }
 
+model Color {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  category    String?  // Ex: "Básicas", "Neutros", "Vibrantes"
+  hexCode     String?  // Ex: "#FFFFFF" para referência visual
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("colors")
+}
+
 model Customer {
   id          String   @id @default(uuid())
   name        String

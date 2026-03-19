@@ -16,6 +16,7 @@ import SettingsView from './views/SettingsView';
 import DocumentationView from './views/DocumentationView';
 import ClothingItemsView from './views/ClothingItemsView';
 import BrandsView from './views/BrandsView';
+import ColorsView from './views/ColorsView';
 import { Spinner } from './components/ui';
 
 // Route guard that checks auth and optionally role
@@ -69,6 +70,9 @@ const AppRoutes: React.FC = () => {
       } />
       <Route path="/brands" element={
         <ProtectedRoute title="Marcas" roles={['ADMIN', 'MANAGER']} element={<BrandsView />} />
+      } />
+      <Route path="/colors" element={
+        <ProtectedRoute title="Cores" roles={['ADMIN', 'MANAGER']} element={<ColorsView />} />
       } />
 
       {/* Admin only */}

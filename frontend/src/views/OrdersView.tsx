@@ -5,8 +5,8 @@ import { useAppContext } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { ordersApi, productsApi } from '../services/api';
 import { formatDate, formatCurrency, isOverdue, daysUntil } from '../utils/helpers';
-import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL, WORKFLOW_STAGES, FINAL_STATUSES, FABRIC_TYPES, ITEM_COLORS, DIRT_LEVELS } from '../constants';
-import { OrderStatus, OrderPriority, ServiceType, SERVICE_TYPE_LABEL, type Order, type Product, type ClothingItem, type Brand } from '../types';
+import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, NEXT_STATUS, NEXT_STATUS_LABEL, WORKFLOW_STAGES, FINAL_STATUSES, FABRIC_TYPES, DIRT_LEVELS } from '../constants';
+import { OrderStatus, OrderPriority, ServiceType, SERVICE_TYPE_LABEL, type Order, type Product, type ClothingItem, type Brand, type Color } from '../types';
 
 // Status que representam ordens ativas (em andamento)
 const ACTIVE_ORDER_STATUSES = [
@@ -33,7 +33,7 @@ interface OrderFormItem {
 }
 
 const OrdersView: React.FC = () => {
-  const { orders, customers, clothingItems, brands, loadingClothingItems, loadingBrands, refreshOrders } = useAppContext();
+  const { orders, customers, clothingItems, brands, colors, loadingClothingItems, loadingBrands, loadingColors, refreshOrders } = useAppContext();
   const { canManage } = useAuth();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('active');
@@ -57,6 +57,8 @@ const OrdersView: React.FC = () => {
   const activeClothingItems = clothingItems.filter(item => item.active);
   // Active brands
   const activeBrands = brands.filter(brand => brand.active);
+  // Active colors
+  const activeColors = colors.filter(color => color.active);
 
   const filtered = orders.filter(o => {
     const matchSearch = !search || o.orderNumber?.toLowerCase().includes(search.toLowerCase()) || o.customer?.name?.toLowerCase().includes(search.toLowerCase());
@@ -359,8 +361,14 @@ const OrdersView: React.FC = () => {
                     <div className="grid grid-cols-3 gap-3">
                       <Select label="Tipo de Tecido" value={item.fabricType} onChange={e => updateItem(idx, 'fabricType', e.target.value)}
                         options={FABRIC_TYPES.map(f => ({ value: f, label: f }))} placeholder="Tipo..." />
-                      <Select label="Cor" value={item.color} onChange={e => updateItem(idx, 'color', e.target.value)}
-                        options={ITEM_COLORS.map(c => ({ value: c, label: c }))} placeholder="Cor..." />
+                      <SearchableSelect
+                        label="Cor"
+                        value={item.color}
+                        onChange={(val) => updateItem(idx, 'color', val)}
+                        options={activeColors.map(c => ({ value: c.name, label: c.name }))}
+                        placeholder="Selecione..."
+                        searchPlaceholder="Buscar cor..."
+                      />
                       <Select label="Sujidade" value={item.dirtLevel} onChange={e => updateItem(idx, 'dirtLevel', e.target.value)}
                         options={DIRT_LEVELS.map(d => ({ value: d, label: d }))} placeholder="Nível..." />
                     </div>

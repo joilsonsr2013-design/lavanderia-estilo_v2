@@ -14,6 +14,7 @@ async function main() {
   await prisma.product.deleteMany();
   await prisma.clothingItem.deleteMany();
   await prisma.brand.deleteMany();
+  await prisma.color.deleteMany();
   await prisma.employee.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.settings.deleteMany();
@@ -262,6 +263,76 @@ async function main() {
     // Outras
     prisma.brand.create({ data: { name: 'Outra', category: 'Outros', country: 'Outros' } }),
     prisma.brand.create({ data: { name: 'Sem Marca', category: 'Outros', country: 'Não informado' } }),
+  ]);
+
+  // Criar cores
+  const colors = await Promise.all([
+    // Cores Básicas
+    prisma.color.create({ data: { name: 'Branco', category: 'Básicas', hexCode: '#FFFFFF' } }),
+    prisma.color.create({ data: { name: 'Preto', category: 'Básicas', hexCode: '#000000' } }),
+    prisma.color.create({ data: { name: 'Cinza', category: 'Básicas', hexCode: '#808080' } }),
+    prisma.color.create({ data: { name: 'Cinza Mescla', category: 'Básicas', hexCode: '#A9A9A9' } }),
+    // Neutros
+    prisma.color.create({ data: { name: 'Bege', category: 'Neutros', hexCode: '#F5F5DC' } }),
+    prisma.color.create({ data: { name: 'Camel', category: 'Neutros', hexCode: '#C19A6B' } }),
+    prisma.color.create({ data: { name: 'Creme', category: 'Neutros', hexCode: '#FFFDD0' } }),
+    prisma.color.create({ data: { name: 'Off-White', category: 'Neutros', hexCode: '#FAF9F6' } }),
+    prisma.color.create({ data: { name: 'Nude', category: 'Neutros', hexCode: '#E3BC9A' } }),
+    prisma.color.create({ data: { name: 'Champagne', category: 'Neutros', hexCode: '#F7E7CE' } }),
+    prisma.color.create({ data: { name: 'Caramelo', category: 'Neutros', hexCode: '#C68E17' } }),
+    // Cores Claras
+    prisma.color.create({ data: { name: 'Rosa Claro', category: 'Cores Claras', hexCode: '#FFB6C1' } }),
+    prisma.color.create({ data: { name: 'Azul Claro', category: 'Cores Claras', hexCode: '#ADD8E6' } }),
+    prisma.color.create({ data: { name: 'Verde Claro', category: 'Cores Claras', hexCode: '#90EE90' } }),
+    prisma.color.create({ data: { name: 'Amarelo Claro', category: 'Cores Claras', hexCode: '#FFFFE0' } }),
+    prisma.color.create({ data: { name: 'Laranja Claro', category: 'Cores Claras', hexCode: '#FFD5B5' } }),
+    // Cores Escuras
+    prisma.color.create({ data: { name: 'Marrom', category: 'Cores Escuras', hexCode: '#8B4513' } }),
+    prisma.color.create({ data: { name: 'Azul Marinho', category: 'Cores Escuras', hexCode: '#000080' } }),
+    prisma.color.create({ data: { name: 'Verde Escuro', category: 'Cores Escuras', hexCode: '#006400' } }),
+    prisma.color.create({ data: { name: 'Vermelho Escuro', category: 'Cores Escuras', hexCode: '#8B0000' } }),
+    prisma.color.create({ data: { name: 'Roxo Escuro', category: 'Cores Escuras', hexCode: '#4B0082' } }),
+    prisma.color.create({ data: { name: 'Borgonha', category: 'Cores Escuras', hexCode: '#800020' } }),
+    // Vibrantes
+    prisma.color.create({ data: { name: 'Vermelho', category: 'Vibrantes', hexCode: '#FF0000' } }),
+    prisma.color.create({ data: { name: 'Laranja', category: 'Vibrantes', hexCode: '#FFA500' } }),
+    prisma.color.create({ data: { name: 'Amarelo', category: 'Vibrantes', hexCode: '#FFFF00' } }),
+    prisma.color.create({ data: { name: 'Rosa', category: 'Vibrantes', hexCode: '#FFC0CB' } }),
+    prisma.color.create({ data: { name: 'Magenta', category: 'Vibrantes', hexCode: '#FF00FF' } }),
+    prisma.color.create({ data: { name: 'Rosa Pink', category: 'Vibrantes', hexCode: '#FF1493' } }),
+    prisma.color.create({ data: { name: 'Coral', category: 'Vibrantes', hexCode: '#FF7F50' } }),
+    prisma.color.create({ data: { name: 'Salmon', category: 'Vibrantes', hexCode: '#FA8072' } }),
+    // Azuis
+    prisma.color.create({ data: { name: 'Azul', category: 'Azuis', hexCode: '#0000FF' } }),
+    prisma.color.create({ data: { name: 'Azul Royal', category: 'Azuis', hexCode: '#4169E1' } }),
+    prisma.color.create({ data: { name: 'Azul Turquesa', category: 'Azuis', hexCode: '#40E0D0' } }),
+    prisma.color.create({ data: { name: 'Azul Petróleo', category: 'Azuis', hexCode: '#005F6A' } }),
+    // Verdes
+    prisma.color.create({ data: { name: 'Verde', category: 'Verdes', hexCode: '#008000' } }),
+    prisma.color.create({ data: { name: 'Verde Militar', category: 'Verdes', hexCode: '#4F5D50' } }),
+    prisma.color.create({ data: { name: 'Verde Menta', category: 'Verdes', hexCode: '#98FB98' } }),
+    prisma.color.create({ data: { name: 'Verde Floresta', category: 'Verdes', hexCode: '#228B22' } }),
+    prisma.color.create({ data: { name: 'Verde Limão', category: 'Verdes', hexCode: '#32CD32' } }),
+    prisma.color.create({ data: { name: 'Verde Oliva', category: 'Verdes', hexCode: '#808000' } }),
+    // Outras
+    prisma.color.create({ data: { name: 'Roxo', category: 'Outras', hexCode: '#800080' } }),
+    prisma.color.create({ data: { name: 'Lilás', category: 'Outras', hexCode: '#C8A2C8' } }),
+    prisma.color.create({ data: { name: 'Violeta', category: 'Outras', hexCode: '#EE82EE' } }),
+    prisma.color.create({ data: { name: 'Bordô', category: 'Outras', hexCode: '#800020' } }),
+    prisma.color.create({ data: { name: 'Vinho', category: 'Outras', hexCode: '#722F37' } }),
+    prisma.color.create({ data: { name: 'Terracota', category: 'Outras', hexCode: '#E2725B' } }),
+    prisma.color.create({ data: { name: 'Bronze', category: 'Outras', hexCode: '#CD7F32' } }),
+    prisma.color.create({ data: { name: 'Cobre', category: 'Outras', hexCode: '#B87333' } }),
+    // Estampados
+    prisma.color.create({ data: { name: 'Colorido', category: 'Estampados', hexCode: null } }),
+    prisma.color.create({ data: { name: 'Estampado', category: 'Estampados', hexCode: null } }),
+    prisma.color.create({ data: { name: 'Listrado', category: 'Estampados', hexCode: null } }),
+    prisma.color.create({ data: { name: 'Xadrez', category: 'Estampados', hexCode: null } }),
+    prisma.color.create({ data: { name: 'Floral', category: 'Estampados', hexCode: null } }),
+    prisma.color.create({ data: { name: 'Geométrico', category: 'Estampados', hexCode: null } }),
+    // Metálicos
+    prisma.color.create({ data: { name: 'Dourado', category: 'Metálicos', hexCode: '#FFD700' } }),
+    prisma.color.create({ data: { name: 'Prateado', category: 'Metálicos', hexCode: '#C0C0C0' } }),
   ]);
 
   // Criar produtos/serviços

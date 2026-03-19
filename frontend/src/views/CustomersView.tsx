@@ -4,7 +4,7 @@ import { PlusIcon, EditIcon, TrashIcon, SearchIcon, UsersIcon, PhoneIcon, MailIc
 import { useAppContext } from '../contexts/AppContext';
 import { customersApi, ordersApi } from '../services/api';
 import { formatDate, formatCurrency } from '../utils/helpers';
-import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, FABRIC_TYPES, ITEM_COLORS, DIRT_LEVELS, WORKFLOW_STAGES, NEXT_STATUS, FINAL_STATUSES, NEXT_STATUS_LABEL } from '../constants';
+import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, FABRIC_TYPES, DIRT_LEVELS, WORKFLOW_STAGES, NEXT_STATUS, FINAL_STATUSES, NEXT_STATUS_LABEL } from '../constants';
 import { OrderStatus, OrderPriority, ServiceType, SERVICE_TYPE_LABEL, type Customer, type Order, type ClothingItem } from '../types';
 import { isOverdue, daysUntil } from '../utils/helpers';
 
