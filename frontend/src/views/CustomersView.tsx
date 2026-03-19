@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { Card, Button, Input, Select, Textarea, Modal, Alert, EmptyState, LoadingState, Badge, SearchableSelect } from '../components/ui';
-import { PlusIcon, EditIcon, TrashIcon, SearchIcon, UsersIcon, PhoneIcon, MailIcon, MapPinIcon, EyeIcon, ClipboardListIcon } from '../components/icons';
+import { PlusIcon, EditIcon, TrashIcon, SearchIcon, UsersIcon, PhoneIcon, MailIcon, MapPinIcon, EyeIcon, ClipboardListIcon, AlertIcon, ChevronRightIcon } from '../components/icons';
 import { useAppContext } from '../contexts/AppContext';
 import { customersApi, ordersApi } from '../services/api';
 import { formatDate, formatCurrency } from '../utils/helpers';
-import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, FABRIC_TYPES, ITEM_COLORS, DIRT_LEVELS } from '../constants';
+import { STATUS_LABEL, STATUS_BG, STATUS_COLOR, PRIORITY_LABEL, PRIORITY_COLOR, FABRIC_TYPES, ITEM_COLORS, DIRT_LEVELS, WORKFLOW_STAGES, NEXT_STATUS, FINAL_STATUSES, NEXT_STATUS_LABEL } from '../constants';
 import { OrderStatus, OrderPriority, ServiceType, SERVICE_TYPE_LABEL, type Customer, type Order, type ClothingItem } from '../types';
+import { isOverdue, daysUntil } from '../utils/helpers';
 
 const empty = { name: '', email: '', phone: '', address: '', notes: '' };
 
@@ -58,6 +59,21 @@ const CustomersView: React.FC = () => {
   const [orderItems, setOrderItems] = useState<OrderFormItem[]>([
     { clothingItemId: '', serviceType: ServiceType.WASH_IRON, brandId: '', quantity: 1, unitPrice: 0, fabricType: '', color: '', dirtLevel: 'Leve', damageNotes: '' }
   ]);
+
+  // Estado para visualizar detalhes da ordem
+  const [viewOrderModal, setViewOrderModal] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+
+  const openOrderDetails = (order: Order, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedOrder(order);
+    setViewOrderModal(true);
+  };
+
+  const closeViewOrderModal = () => {
+    setViewOrderModal(false);
+    setSelectedOrder(null);
+  };
 
   // Active clothing items
   const activeClothingItems = clothingItems.filter(item => item.active);
@@ -328,48 +344,79 @@ const CustomersView: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {activeOrders.map(order => (
-                    <div key={order.id} className="bg-slate-50 rounded-xl p-4 border border-slate-100 hover:border-slate-200 transition-colors">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
-                          <span className="font-semibold text-slate-800 text-sm">#{order.orderNumber}</span>
-                          {order.priority && (
-                            <Badge color={PRIORITY_COLOR[order.priority as keyof typeof PRIORITY_COLOR]} className="ml-2">
-                              {PRIORITY_LABEL[order.priority as keyof typeof PRIORITY_LABEL]}
-                            </Badge>
-                          )}
-                        </div>
-                        <Badge color={STATUS_BG[order.status] + ' ' + STATUS_COLOR[order.status]}>
-                          {STATUS_LABEL[order.status]}
-                        </Badge>
-                      </div>
-                      {order.description && (
-                        <p className="text-xs text-slate-500 mb-2">{order.description}</p>
-                      )}
-                      <div className="flex flex-wrap gap-4 text-xs text-slate-500">
-                        <span>Valor: <strong className="text-slate-700">{formatCurrency(order.totalAmount)}</strong></span>
-                        {order.dueDate && (
-                          <span>Entrega: <strong className="text-slate-700">{formatDate(order.dueDate)}</strong></span>
-                        )}
-                        <span>Criado: <strong className="text-slate-700">{formatDate(order.createdAt)}</strong></span>
-                      </div>
-                      {order.items && order.items.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-slate-200">
-                          <p className="text-xs text-slate-500 mb-1">Itens:</p>
-                          <div className="flex flex-wrap gap-2">
-                            {order.items.slice(0, 3).map((item, idx) => (
-                              <span key={idx} className="text-xs bg-white px-2 py-1 rounded border border-slate-200">
-                                {item.product?.name || 'Produto'} x{item.quantity}
-                              </span>
-                            ))}
-                            {order.items.length > 3 && (
-                              <span className="text-xs text-slate-400">+{order.items.length - 3} mais</span>
+                  {activeOrders.map(order => {
+                    const overdue = isOverdue(order.dueDate);
+                    const days = daysUntil(order.dueDate);
+                    return (
+                      <div key={order.id} className="bg-slate-50 rounded-xl p-4 border border-slate-100 hover:border-brand-300 transition-colors">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={(e) => openOrderDetails(order, e)}
+                              className="font-semibold text-brand-600 text-sm hover:underline"
+                            >
+                              #{order.orderNumber?.slice(-8).toUpperCase()}
+                            </button>
+                            {order.priority && (
+                              <Badge color={PRIORITY_COLOR[order.priority as keyof typeof PRIORITY_COLOR]}>
+                                {PRIORITY_LABEL[order.priority as keyof typeof PRIORITY_LABEL]}
+                              </Badge>
                             )}
                           </div>
+                          <div className="flex items-center gap-2">
+                            <Badge color={STATUS_BG[order.status] + ' ' + STATUS_COLOR[order.status]}>
+                              {STATUS_LABEL[order.status]}
+                            </Badge>
+                            <Button size="sm" variant="ghost" onClick={(e) => openOrderDetails(order, e)} title="Ver detalhes">
+                              <EyeIcon className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
+                        {order.description && (
+                          <p className="text-xs text-slate-500 mb-2">{order.description}</p>
+                        )}
+                        <div className="flex flex-wrap gap-4 text-xs text-slate-500 mb-2">
+                          <span>Valor: <strong className="text-slate-700">{formatCurrency(order.totalAmount)}</strong></span>
+                          {order.dueDate && (
+                            <span className={`flex items-center gap-1 ${overdue ? 'text-red-600' : days !== null && days <= 1 ? 'text-amber-600' : ''}`}>
+                              {overdue && <AlertIcon className="h-3 w-3" />}
+                              Entrega: <strong>{formatDate(order.dueDate)}</strong>
+                            </span>
+                          )}
+                          <span>Criado: <strong className="text-slate-700">{formatDate(order.createdAt)}</strong></span>
+                        </div>
+                        {order.items && order.items.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-slate-200">
+                            <p className="text-xs text-slate-500 mb-2">Itens ({order.items.length}):</p>
+                            <div className="space-y-1">
+                              {order.items.map((item, idx) => (
+                                <div key={idx} className="flex justify-between items-center text-xs bg-white p-2 rounded-lg border border-slate-100">
+                                  <div className="flex-1">
+                                    <span className="font-medium text-slate-700">
+                                      {item.clothingItem?.name || item.product?.name || 'Item'}
+                                    </span>
+                                    {item.serviceType && (
+                                      <span className="text-slate-400 ml-1">({SERVICE_TYPE_LABEL[item.serviceType as ServiceType]})</span>
+                                    )}
+                                    <span className="text-slate-500 ml-1">×{item.quantity}</span>
+                                    {item.brand && (
+                                      <span className="text-brand-600 ml-1">- {item.brand.name}</span>
+                                    )}
+                                  </div>
+                                  <div className="text-right">
+                                    <span className="font-semibold text-slate-700">{formatCurrency(item.totalPrice)}</span>
+                                    {(item.fabricType || item.color || item.dirtLevel) && (
+                                      <p className="text-slate-400 text-xs mt-0.5">{[item.fabricType, item.color, item.dirtLevel].filter(Boolean).join(' • ')}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -380,21 +427,26 @@ const CustomersView: React.FC = () => {
                 <h4 className="text-sm font-semibold text-slate-600 mb-3">
                   Histórico de Pedidos ({selectedCustomer.orders.length - activeOrders.length} finalizados)
                 </h4>
-                <div className="text-xs text-slate-500 bg-slate-50 rounded-xl p-3">
+                <div className="space-y-2">
                   {selectedCustomer.orders.filter(o => !ACTIVE_STATUSES.includes(o.status)).slice(0, 5).map(order => (
-                    <div key={order.id} className="flex justify-between items-center py-1 border-b border-slate-100 last:border-0">
-                      <span>#{order.orderNumber}</span>
-                      <span className="text-slate-400">{formatDate(order.createdAt)}</span>
-                      <Badge color={STATUS_BG[order.status] + ' ' + STATUS_COLOR[order.status]} className="text-xs">
-                        {STATUS_LABEL[order.status]}
-                      </Badge>
+                    <div
+                      key={order.id}
+                      className="flex justify-between items-center py-2 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+                      onClick={(e) => openOrderDetails(order, e)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-semibold text-brand-600">#{order.orderNumber?.slice(-8).toUpperCase()}</span>
+                        <span className="text-xs text-slate-400">{formatDate(order.createdAt)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-700">{formatCurrency(order.totalAmount)}</span>
+                        <Badge color={STATUS_BG[order.status] + ' ' + STATUS_COLOR[order.status]} className="text-xs">
+                          {STATUS_LABEL[order.status]}
+                        </Badge>
+                        <EyeIcon className="h-3 w-3 text-slate-400" />
+                      </div>
                     </div>
                   ))}
-                  {selectedCustomer.orders.length > 5 && (
-                    <p className="text-center text-slate-400 mt-2">
-                      E mais {selectedCustomer.orders.length - 5} pedidos...
-                    </p>
-                  )}
                 </div>
               </div>
             )}
@@ -501,6 +553,107 @@ const CustomersView: React.FC = () => {
           </form>
         )}
       </Modal>
+
+      {/* Order Detail Modal */}
+      {selectedOrder && (
+        <Modal isOpen={viewOrderModal} onClose={closeViewOrderModal} title={`Pedido #${selectedOrder.orderNumber?.slice(-8).toUpperCase()}`} size="lg">
+          <div className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Badge color={`${STATUS_BG[selectedOrder.status]} ${STATUS_COLOR[selectedOrder.status]}`}>
+                {STATUS_LABEL[selectedOrder.status]}
+              </Badge>
+              {selectedOrder.priority && (
+                <Badge color={PRIORITY_COLOR[selectedOrder.priority as keyof typeof PRIORITY_COLOR]}>
+                  {PRIORITY_LABEL[selectedOrder.priority as keyof typeof PRIORITY_LABEL]}
+                </Badge>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="font-semibold text-slate-600">Cliente:</span> <span>{selectedOrder.customer?.name}</span></div>
+              <div><span className="font-semibold text-slate-600">Total:</span> <span>{formatCurrency(selectedOrder.totalAmount)}</span></div>
+              {selectedOrder.dueDate && (
+                <div className="flex items-center gap-1">
+                  <span className="font-semibold text-slate-600">Prazo:</span>
+                  <span className={isOverdue(selectedOrder.dueDate) ? 'text-red-600' : daysUntil(selectedOrder.dueDate) !== null && daysUntil(selectedOrder.dueDate) <= 1 ? 'text-amber-600' : ''}>
+                    {formatDate(selectedOrder.dueDate)}
+                    {isOverdue(selectedOrder.dueDate) && <AlertIcon className="h-3 w-3 inline ml-1" />}
+                  </span>
+                </div>
+              )}
+              <div><span className="font-semibold text-slate-600">Criado:</span> <span>{formatDate(selectedOrder.createdAt)}</span></div>
+              {selectedOrder.description && (
+                <div className="col-span-2"><span className="font-semibold text-slate-600">Obs.:</span> <span>{selectedOrder.description}</span></div>
+              )}
+            </div>
+
+            {/* Order Items */}
+            {selectedOrder.items && selectedOrder.items.length > 0 && (
+              <div>
+                <p className="font-bold text-slate-700 mb-2 text-sm">Itens ({selectedOrder.items.length}):</p>
+                <div className="space-y-2">
+                  {selectedOrder.items.map((item, i) => (
+                    <div key={i} className="p-3 bg-slate-50 rounded-xl text-sm">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="font-semibold text-slate-700">
+                            {item.clothingItem?.name || item.product?.name || 'Item'} × {item.quantity}
+                            {item.serviceType && (
+                              <span className="text-xs text-slate-500 ml-2">({SERVICE_TYPE_LABEL[item.serviceType as ServiceType]})</span>
+                            )}
+                          </p>
+                          {item.brand && (
+                            <p className="text-xs text-brand-600">Marca: {item.brand.name}</p>
+                          )}
+                          <p className="text-xs text-slate-500 mt-1">
+                            {[item.fabricType, item.color, item.dirtLevel].filter(Boolean).join(' • ')}
+                          </p>
+                          {item.damageNotes && (
+                            <p className="text-xs text-red-500 mt-1">{item.damageNotes}</p>
+                          )}
+                        </div>
+                        <span className="font-bold text-slate-700">{formatCurrency(item.totalPrice)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Workflow Progress */}
+            <div>
+              <p className="font-bold text-slate-700 mb-2 text-sm">Progresso:</p>
+              <div className="flex items-center gap-1 overflow-x-auto pb-2">
+                {WORKFLOW_STAGES.filter(s => s.id !== OrderStatus.CANCELLED).map((stage, i) => {
+                  const stages = Object.values(OrderStatus).filter(s => s !== OrderStatus.CANCELLED);
+                  const currentIdx = stages.indexOf(selectedOrder.status);
+                  const stageIdx = stages.indexOf(stage.id);
+                  const isDone = stageIdx < currentIdx;
+                  const isCurrent = stageIdx === currentIdx;
+                  return (
+                    <React.Fragment key={stage.id}>
+                      <div className="shrink-0 flex flex-col items-center">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
+                          ${isDone ? 'bg-green-500 text-white' : isCurrent ? 'bg-brand-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                          {isDone ? '✓' : i + 1}
+                        </div>
+                        <span className={`text-xs mt-1 whitespace-nowrap ${isCurrent ? 'text-brand-600 font-bold' : 'text-slate-400'}`}>{stage.label}</span>
+                      </div>
+                      {i < WORKFLOW_STAGES.filter(s => s.id !== OrderStatus.CANCELLED).length - 1 && (
+                        <div className={`flex-1 h-0.5 min-w-[8px] ${isDone ? 'bg-green-400' : 'bg-slate-200'}`} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+              <Button variant="outline" onClick={closeViewOrderModal}>Fechar</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 };

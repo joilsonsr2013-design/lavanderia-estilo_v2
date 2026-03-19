@@ -35,7 +35,15 @@ customerRoutes.get('/:id', async (req, res) => {
         orders: {
           orderBy: { createdAt: 'desc' },
           take: 10,
-          include: { items: { include: { product: true } } }
+          include: {
+            items: {
+              include: {
+                product: true,
+                clothingItem: true,
+                brand: true
+              }
+            }
+          }
         },
         _count: { select: { orders: true } }
       }
